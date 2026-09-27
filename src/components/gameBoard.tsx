@@ -1,7 +1,9 @@
 import * as React from "react";
 import styles from "../styles/gameBoard.module.css";
+import anim from "../styles/animations.module.css";
 import {
   CardName,
+  CardWithSource,
   EventName,
   LocationName,
   LocationType,
@@ -9,193 +11,266 @@ import {
 } from "../model/types";
 import { Player } from "../model/player";
 import { GameState } from "../model/gameState";
-import { GameStateJSON } from "../model/jsonTypes";
 import { Event as EventModel, oldEventEnums } from "../model/event";
 import { Location as LocationModel } from "../model/location";
 import { Visitor as VisitorModel } from "../model/visitor";
 
-import GameLog from "./GameLog";
 import Card, { PlayedCard, EmptyCard } from "./Card";
 import Location from "./Location";
 import TrainCarTile from "./TrainCarTile";
 import { RiverDestinationSpot } from "./RiverDestination";
 import Adornment from "./Adornment";
-import Event from "./Event";
+import Event, { EventInner } from "./Event";
 import { VisitorInner as Visitor } from "./Visitor";
 import { GameBlock, ItemWrapper } from "./common";
+import { Zoomable } from "./CardZoom";
+import { useBoardSelection, isSameCardWithSource } from "./BoardSelection";
+import { BoardScenery } from "./Ambience";
+import PixelSprite from "./pixel/PixelSprite";
+import * as Sprites from "./pixel/sprites";
 
-export const Meadow: React.FC<{ meadowCards: CardName[] }> = ({
-  meadowCards,
+// Keys cards by name + occurrence so a card keeps its element when others
+// leave the row, and only newly dealt cards animate in.
+export function keyByOccurrence(names: (string | null)[]): string[] {
+  const seen: Record<string, number> = {};
+  return names.map((name) => {
+    const key = name || "empty";
+    seen[key] = (seen[key] || 0) + 1;
+    return `${key}#${seen[key]}`;
+  });
+}
+
+// A card on the board (meadow / station / hand) that can be clicked to play.
+export const BoardCard: React.FC<{
+  cardName: CardName;
+  cardWithSource: CardWithSource;
+  interactive?: boolean;
+  zoomable?: boolean;
+  delay?: number;
+  className?: string;
+  badgeOnTop?: boolean;
+}> = ({
+  cardName,
+  cardWithSource,
+  interactive = true,
+  zoomable = true,
+  delay = 0,
+  className,
+  badgeOnTop = false,
 }) => {
+  const selection = useBoardSelection();
+  const isPlayable =
+    interactive &&
+    selection.cardOptions.some((x) => isSameCardWithSource(x, cardWithSource));
+  const isSelected =
+    interactive && isSameCardWithSource(selection.selectedCard, cardWithSource);
+  const select = () => selection.selectCard(cardWithSource);
   return (
-    <GameBlock title={"Meadow"}>
-      <div id={"js-meadow-cards"}>
-        <div className={styles.items_no_wrap}>
-          {meadowCards.slice(0, 4).map((cardName, idx) => (
-            <ItemWrapper key={idx}>
-              <Card name={cardName} />
-            </ItemWrapper>
-          ))}
-        </div>
-        <div className={styles.items_no_wrap}>
-          {meadowCards.slice(4).map((cardName, idx) => (
-            <ItemWrapper key={idx}>
-              <Card name={cardName} />
-            </ItemWrapper>
-          ))}
-        </div>
+    <div
+      className={[
+        styles.board_card,
+        anim.dealIn,
+        isPlayable && styles.playable,
+        isSelected && styles.selected_card,
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      style={delay ? { animationDelay: `${delay}ms` } : undefined}
+      onClick={isPlayable ? select : undefined}
+      role={isPlayable ? "button" : undefined}
+      tabIndex={isPlayable ? 0 : undefined}
+      onKeyDown={
+        isPlayable
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                select();
+              }
+            }
+          : undefined
+      }
+      title={isPlayable ? `Click to play ${cardName}` : undefined}
+    >
+      <Zoomable
+        disabled={!zoomable}
+        render={() => <Card name={cardName} />}
+        className={styles.board_card_inner}
+      >
+        <Card name={cardName} />
+      </Zoomable>
+      {isPlayable && (
+        <span
+          className={[styles.play_badge, badgeOnTop && styles.play_badge_top]
+            .filter(Boolean)
+            .join(" ")}
+          aria-hidden={true}
+        >
+          {isSelected ? "Selected" : "Play"}
+        </span>
+      )}
+    </div>
+  );
+};
+
+export const Meadow: React.FC<{
+  meadowCards: CardName[];
+  interactive?: boolean;
+}> = ({ meadowCards, interactive = false }) => {
+  const keys = keyByOccurrence(meadowCards);
+  return (
+    <GameBlock
+      title={"Meadow"}
+      className={styles.meadow_block}
+      icon={<PixelSprite sprite={Sprites.BLOSSOM} height="16px" />}
+    >
+      <div id={"js-meadow-cards"} className={styles.meadow_grid}>
+        {meadowCards.map((cardName, idx) => (
+          <BoardCard
+            key={keys[idx]}
+            cardName={cardName}
+            cardWithSource={{ card: cardName, source: "MEADOW", sourceIdx: idx }}
+            interactive={interactive}
+            delay={idx * 60}
+          />
+        ))}
       </div>
     </GameBlock>
   );
 };
 
-const StationCard: React.FC<{ position: 0 | 1 | 2; gameState: GameState }> = ({
-  position,
-  gameState,
-}) => {
+const StationCard: React.FC<{
+  position: 0 | 1 | 2;
+  gameState: GameState;
+  interactive: boolean;
+}> = ({ position, gameState, interactive }) => {
   if (!gameState.trainCarTileStack) {
     return null;
   }
   const cardName = gameState.stationCards[position];
   return (
-    <ItemWrapper>
-      <div className={styles.station_card}>
-        {cardName ? <Card name={cardName} /> : <EmptyCard />}
-        <TrainCarTile name={gameState.trainCarTileStack.peekAt(position)} />
-      </div>
-    </ItemWrapper>
-  );
-};
-
-export const Station: React.FC<{ gameState: GameState }> = ({ gameState }) => {
-  if (!gameState.trainCarTileStack) {
-    return null;
-  }
-  return (
-    <GameBlock title={"Station"}>
-      <div id={"js-station"}>
-        <div className={[styles.items_no_wrap, styles.station_cards].join(" ")}>
-          <StationCard position={0} gameState={gameState} />
-          <StationCard position={1} gameState={gameState} />
-          <StationCard position={2} gameState={gameState} />
-        </div>
-      </div>
-    </GameBlock>
-  );
-};
-
-export const LocationsAndEvents: React.FC<{
-  gameState: GameState;
-  viewingPlayer: Player | null;
-}> = ({ gameState, viewingPlayer }) => {
-  return (
-    <div className={styles.locations_and_events}>
-      <Locations gameState={gameState} viewingPlayer={viewingPlayer} />
-      <Events gameState={gameState} />
+    <div className={styles.station_card}>
+      {cardName ? (
+        <BoardCard
+          key={cardName}
+          cardName={cardName}
+          cardWithSource={{
+            card: cardName,
+            source: "STATION",
+            sourceIdx: position,
+          }}
+          interactive={interactive}
+        />
+      ) : (
+        <EmptyCard label="Empty" />
+      )}
+      <TrainCarTile
+        name={gameState.trainCarTileStack.peekAt(position)}
+        label={`Station ${position + 1}`}
+      />
     </div>
   );
 };
 
-export const Locations: React.FC<{
+export const Station: React.FC<{
   gameState: GameState;
-  viewingPlayer: Player | null;
-}> = ({ gameState, viewingPlayer }) => {
-  const locationsMap = gameState.locationsMap;
-  const allLocations = Object.keys(locationsMap) as LocationName[];
-  const allLocationObjs = allLocations.map((x) => LocationModel.fromName(x));
-
-  const sortOrder: Record<LocationType, number> = {
-    [LocationType.FOREST]: 1,
-    [LocationType.BASIC]: 2,
-    [LocationType.KNOLL]: 3,
-    [LocationType.STATION]: 4,
-    [LocationType.HAVEN]: 5,
-    [LocationType.JOURNEY]: 6,
-  };
-
-  allLocationObjs.sort((a, b) => {
-    return sortOrder[a.type] - sortOrder[b.type];
-  });
-
-  const renderLocationWithPlayerNames = (name: LocationName) => {
-    return (
-      <Location
-        key={name}
-        name={name}
-        gameState={gameState}
-        viewingPlayer={viewingPlayer}
-        playerWorkers={(locationsMap[name] || []).map(
-          (pId) => gameState.getPlayer(pId).name
-        )}
-      />
-    );
-  };
-
+  interactive?: boolean;
+}> = ({ gameState, interactive = false }) => {
+  if (!gameState.trainCarTileStack) {
+    return null;
+  }
   return (
-    <GameBlock title={"Locations"}>
-      <div className={styles.location_items}>
-        {allLocationObjs.map((location, idx) => {
-          return renderLocationWithPlayerNames(location.name);
-        })}
+    <GameBlock
+      title={"Station"}
+      icon={<PixelSprite sprite={Sprites.TRAIN} height="16px" />}
+    >
+      <div id={"js-station"} className={styles.station_cards}>
+        <StationCard
+          position={0}
+          gameState={gameState}
+          interactive={interactive}
+        />
+        <StationCard
+          position={1}
+          gameState={gameState}
+          interactive={interactive}
+        />
+        <StationCard
+          position={2}
+          gameState={gameState}
+          interactive={interactive}
+        />
       </div>
     </GameBlock>
   );
 };
 
-export const LocationForType: React.FC<{
+const renderLocation = (
+  name: LocationName,
+  gameState: GameState,
+  viewingPlayer: Player | null
+) => (
+  <Location
+    key={name}
+    name={name}
+    gameState={gameState}
+    viewingPlayer={viewingPlayer}
+    workers={gameState.locationsMap[name] || []}
+  />
+);
+
+const getLocationsOfType = (
+  gameState: GameState,
+  locationType: LocationType
+): LocationName[] =>
+  (Object.keys(gameState.locationsMap) as LocationName[]).filter(
+    (name) => LocationModel.fromName(name).type === locationType
+  );
+
+const SectionLabel: React.FC<{ hint?: string }> = ({ hint, children }) => (
+  <div className={styles.section_label}>
+    <span>{children}</span>
+    {hint && <small>{hint}</small>}
+  </div>
+);
+
+const JourneyTrack: React.FC<{
   gameState: GameState;
   viewingPlayer: Player | null;
-  locationType: LocationType;
-  title: string;
-}> = ({ gameState, viewingPlayer, locationType, title }) => {
-  const locationsMap = gameState.locationsMap;
-  const allLocations = Object.keys(locationsMap) as LocationName[];
-  const allLocationObjs = allLocations.map((x) => LocationModel.fromName(x));
-  const allForestLocationObjs = allLocationObjs.filter(
-    (x) => x.type === locationType
-  );
-  const renderLocationWithPlayerNames = (name: LocationName) => {
-    return (
-      <Location
-        key={name}
-        name={name}
-        gameState={gameState}
-        viewingPlayer={viewingPlayer}
-        playerWorkers={(locationsMap[name] || []).map(
-          (pId) => gameState.getPlayer(pId).name
-        )}
-      />
-    );
-  };
-
-  if (allForestLocationObjs.length === 0) {
+  locations: LocationName[];
+}> = ({ gameState, viewingPlayer, locations }) => {
+  if (locations.length === 0) {
     return null;
-  } else {
-    return gameState.gameOptions.newleaf?.visitors ? (
-      <GameBlock title={title}>
-        <div className={styles.forest_locations_newleaf}>
-          {allForestLocationObjs.map((location, idx) => {
-            return renderLocationWithPlayerNames(location.name);
-          })}
-        </div>
-      </GameBlock>
-    ) : (
-      <GameBlock title={title}>
-        <div className={styles.forest_locations}>
-          {allForestLocationObjs.map((location, idx) => {
-            return renderLocationWithPlayerNames(location.name);
-          })}
-        </div>
-      </GameBlock>
-    );
   }
+  const sorted = [...locations].sort(
+    (a, b) =>
+      LocationModel.fromName(b).getPoints(viewingPlayer as Player, gameState) -
+      LocationModel.fromName(a).getPoints(viewingPlayer as Player, gameState)
+  );
+  return (
+    <div className={styles.journey}>
+      <SectionLabel hint="Autumn">Journey</SectionLabel>
+      <div className={styles.journey_list}>
+        {sorted.map((name) => (
+          <Location
+            key={name}
+            name={name}
+            variant="row"
+            gameState={gameState}
+            viewingPlayer={viewingPlayer}
+            workers={gameState.locationsMap[name] || []}
+          />
+        ))}
+      </div>
+    </div>
+  );
 };
 
 export const Events: React.FC<{
   gameState: GameState;
-  numColumns?: number;
-}> = ({ gameState, numColumns = 3 }) => {
-  const renderClaimedEvent = (name: EventName) => {
+  interactive?: boolean;
+}> = ({ gameState, interactive = false }) => {
+  const getClaimerId = (name: EventName): string | null => {
     // See comment above oldEventEnums
     const oldEventName = Object.keys(gameState.eventsMap).find(
       (oldEventName) => {
@@ -205,46 +280,45 @@ export const Events: React.FC<{
         }
       }
     );
-
-    const playerId =
-      gameState.eventsMap[name] ||
-      (oldEventName && gameState.eventsMap[oldEventName as EventName]);
-    const claimedBy = playerId ? gameState.getPlayer(playerId).name : null;
     return (
-      <div key={name} className={styles.event_item}>
-        <Event name={name} claimedBy={claimedBy} />
-      </div>
+      gameState.eventsMap[name] ||
+      (oldEventName && gameState.eventsMap[oldEventName as EventName]) ||
+      null
     );
   };
-  const allEvents = Object.keys(gameState.eventsMap) as EventName[];
-  const allEventObj = allEvents.map((eventName) =>
-    EventModel.fromName(eventName)
+  const typeOrder: Record<EventType, number> = {
+    [EventType.BASIC]: 0,
+    [EventType.SPECIAL]: 1,
+    [EventType.WONDER]: 2,
+  };
+  const allEventObj = (Object.keys(gameState.eventsMap) as EventName[]).map(
+    (eventName) => EventModel.fromName(eventName)
   );
-
-  allEventObj.sort((a, b) => {
-    return (
-      (a.type === EventType.BASIC ? -1 : 1) -
-      (b.type === EventType.BASIC ? -1 : 1)
-    );
-  });
-
-  const columns: EventModel[][] = [];
-  allEventObj.forEach((event, idx) => {
-    const colIdx = idx % numColumns;
-    columns[colIdx] = columns[colIdx] || [];
-    columns[colIdx]!.push(event);
-  });
+  allEventObj.sort((a, b) => typeOrder[a.type] - typeOrder[b.type]);
 
   return (
     <GameBlock
       title={gameState.gameOptions.pearlbrook ? "Events & Wonders" : "Events"}
+      icon={<PixelSprite sprite={Sprites.FLAG} height="16px" />}
+      className={styles.events_block}
     >
       <div id={"js-game-events"} className={styles.event_items}>
-        {columns.map((events, idx) => {
+        {allEventObj.map((event) => {
+          const playerId = getClaimerId(event.name);
           return (
-            <div key={idx} className={styles.event_items_col}>
-              {events.map((event) => renderClaimedEvent(event.name))}
-            </div>
+            <Zoomable
+              key={event.name}
+              className={styles.event_item}
+              render={() => <EventInner name={event.name} />}
+            >
+              <Event
+                name={event.name}
+                claimedBy={playerId ? gameState.getPlayer(playerId).name : null}
+                claimedById={playerId}
+                compact={true}
+                interactive={interactive}
+              />
+            </Zoomable>
           );
         })}
       </div>
@@ -274,19 +348,16 @@ export const PlayerCity: React.FC<{
   return playedCards.length !== 0 ||
     playedAdornments.length !== 0 ||
     claimedVisitors.length !== 0 ? (
-    <div data-cy={`player-city:${player.name}`}>
+    <div data-cy={`player-city:${player.name}`} className={styles.city}>
       <div className={styles.city_stats}>
         {labelToCount
           .filter(([_, count]) => count)
-          .map(([label, count], idx) => {
+          .map(([label, count]) => {
             return (
-              <React.Fragment key={label}>
-                {idx !== 0 && "/"}
-                <div className={styles.city_stat}>
-                  <span>{label}: </span>
-                  <span>{count}</span>
-                </div>
-              </React.Fragment>
+              <div key={label} className={styles.city_stat}>
+                <span>{label}: </span>
+                <b>{count}</b>
+              </div>
             );
           })}
       </div>
@@ -332,79 +403,84 @@ export const PlayerCity: React.FC<{
 
 export const GameBoard: React.FC<{
   gameState: GameState;
-  gameStateJSON: GameStateJSON;
   viewingPlayer: Player | null;
-}> = ({ gameState, gameStateJSON, viewingPlayer }) => {
+}> = ({ gameState, viewingPlayer }) => {
+  const renderLoc = (name: LocationName) =>
+    renderLocation(name, gameState, viewingPlayer);
+  const basic = getLocationsOfType(gameState, LocationType.BASIC);
+  const forest = getLocationsOfType(gameState, LocationType.FOREST);
+  const haven = getLocationsOfType(gameState, LocationType.HAVEN);
+  const journey = getLocationsOfType(gameState, LocationType.JOURNEY);
+  const knoll = getLocationsOfType(gameState, LocationType.KNOLL);
+  const station = getLocationsOfType(gameState, LocationType.STATION);
+  const half = Math.ceil(forest.length / 2);
+  const interactive =
+    !!viewingPlayer && gameState.activePlayerId === viewingPlayer.playerId;
+  const showStationCards = !!gameState.gameOptions.newleaf?.station;
+  const visitors =
+    station.length !== 0 && gameState.visitorStack
+      ? gameState.visitorStack.getRevealedVisitors().filter(Boolean)
+      : [];
+
   return (
-    <div className={styles.game_board}>
-      <div>
-        {gameState.gameOptions.newleaf?.visitors ? (
-          <div>
-            <LocationForType
-              gameState={gameState}
-              locationType={LocationType.FOREST}
-              title="Forest Locations"
-              viewingPlayer={viewingPlayer}
-            />{" "}
-          </div>
-        ) : null}
-        <div className={styles.game_board_meadow}>
-          <Meadow meadowCards={gameState.meadowCards} />
+    <div className={styles.board}>
+      <BoardScenery />
+      <section className={styles.riverbank}>
+        <SectionLabel>Basic Locations</SectionLabel>
+        <div className={styles.basic_row}>{basic.map(renderLoc)}</div>
+      </section>
+      <section className={styles.clearing}>
+        <div className={[styles.side_col, styles.side_left].join(" ")}>
+          <SectionLabel>Forest</SectionLabel>
+          {forest.slice(0, half).map(renderLoc)}
+          {haven.map(renderLoc)}
         </div>
-        <GameLog logs={gameState.getGameLog()} gameStateJSON={gameStateJSON} />
-      </div>
-      {gameState.gameOptions.newleaf?.station ? (
-        <>
-          <Station gameState={gameState} />
-          <div>
-            {gameState.gameOptions.newleaf?.visitors &&
-            gameState.visitorStack !== null ? (
-              <GameBlock title="Visitors">
-                <div className={styles.station_visitors}>
-                  <Location
-                    key={LocationName.STATION}
-                    name={LocationName.STATION}
-                    gameState={gameState}
-                    viewingPlayer={viewingPlayer}
-                    playerWorkers={(
-                      gameState.locationsMap[LocationName.STATION] || []
-                    ).map((pId) => gameState.getPlayer(pId).name)}
-                  />
-                  <ItemWrapper>
-                    <Visitor
-                      name={gameState.visitorStack.getRevealedVisitors()[0]}
-                    />
-                  </ItemWrapper>
-
-                  <ItemWrapper>
-                    <Visitor
-                      name={gameState.visitorStack.getRevealedVisitors()[1]}
-                    />
-                  </ItemWrapper>
-                </div>
-              </GameBlock>
-            ) : null}
-            <LocationForType
-              gameState={gameState}
-              locationType={LocationType.KNOLL}
-              title="Knoll"
-              viewingPlayer={viewingPlayer}
-            />
-          </div>
-        </>
-      ) : (
-        <>
-          <LocationForType
+        <Meadow meadowCards={gameState.meadowCards} interactive={interactive} />
+        <div className={[styles.side_col, styles.side_right].join(" ")}>
+          {forest.length > 1 && <SectionLabel>Forest</SectionLabel>}
+          {forest.slice(half).map(renderLoc)}
+          <JourneyTrack
             gameState={gameState}
-            locationType={LocationType.FOREST}
-            title="Forest Locations"
             viewingPlayer={viewingPlayer}
+            locations={journey}
           />
-
-          <div className={styles.game_board_events}>
-            <Events gameState={gameState} numColumns={2} />
-          </div>
-        </>
+        </div>
+      </section>
+      <Events gameState={gameState} interactive={interactive} />
+      {gameState.gameOptions.pearlbrook && gameState.riverDestinationMap && (
+        <River gameState={gameState} viewingPlayer={viewingPlayer} />
+      )}
+      {(showStationCards || visitors.length !== 0 || knoll.length !== 0) && (
+        <section className={styles.expansion_row}>
+          {showStationCards && (
+            <Station gameState={gameState} interactive={interactive} />
+          )}
+          {visitors.length !== 0 && (
+            <GameBlock
+              title="Visitors"
+              icon={<PixelSprite sprite={Sprites.TICKET} height="16px" />}
+            >
+              <div className={styles.station_visitors}>
+                {station.map(renderLoc)}
+                {visitors.map((visitor) => (
+                  <ItemWrapper key={visitor}>
+                    <Visitor name={visitor} />
+                  </ItemWrapper>
+                ))}
+              </div>
+            </GameBlock>
+          )}
+          {knoll.length !== 0 && (
+            <GameBlock
+              title="Knoll"
+              icon={<PixelSprite sprite={Sprites.HILL} height="16px" />}
+            >
+              <div className={styles.station_visitors}>
+                {knoll.map(renderLoc)}
+              </div>
+            </GameBlock>
+          )}
+        </section>
       )}
     </div>
   );
@@ -413,9 +489,13 @@ export const GameBoard: React.FC<{
 export const River: React.FC<{
   gameState: GameState;
   viewingPlayer: Player | null;
-}> = ({ gameState, viewingPlayer }) => {
+}> = ({ gameState }) => {
   return (
-    <GameBlock title={"River"}>
+    <GameBlock
+      title={"River"}
+      icon={<PixelSprite sprite={Sprites.PEARL} height="16px" />}
+      className={styles.river_block}
+    >
       <div id={"js-game-river"} className={styles.river_items}>
         {gameState
           .riverDestinationMap!.spotEntries()
@@ -428,6 +508,7 @@ export const River: React.FC<{
                 ambassadors={spotInfo.ambassadors.map(
                   (playerId) => gameState.getPlayer(playerId).name
                 )}
+                ambassadorIds={spotInfo.ambassadors}
               />
             );
           })}

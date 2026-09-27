@@ -13,6 +13,7 @@ import {
 import { Player } from "../model/player";
 import { inputContextPrefix, toGameText } from "../model/gameText";
 
+import styles from "../styles/GameInputBox.module.css";
 import { GameBlock, Description } from "./common";
 import { assertUnreachable } from "../utils";
 import { GameUpdaterContext } from "./GameUpdater";
@@ -38,27 +39,37 @@ export const GameInputBoxContainer: React.FC<{
 }) => {
   const updateGameState = useContext(GameUpdaterContext);
   return (
-    <GameBlock id={"js-game-input-box-form"} title={title}>
+    <GameBlock
+      id={"js-game-input-box-form"}
+      title={title}
+      className={[styles.panel, styles.panel_active].join(" ")}
+    >
       <Formik
         enableReinitialize={true}
         initialValues={initialValues}
         onSubmit={async (values, bag) => {
-          const response = await fetch("/api/game-action", {
-            method: "POST",
-            cache: "no-cache",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              gameId,
-              playerId: viewingPlayer.playerId,
-              playerSecret: viewingPlayer.playerSecretUNSAFE,
-              gameInput: values.gameInput,
-            }),
-          });
-          const json = await response.json();
+          bag.setStatus(null);
+          let json: { success?: boolean; error?: string } = {};
+          try {
+            const response = await fetch("/api/game-action", {
+              method: "POST",
+              cache: "no-cache",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                gameId,
+                playerId: viewingPlayer.playerId,
+                playerSecret: viewingPlayer.playerSecretUNSAFE,
+                gameInput: values.gameInput,
+              }),
+            });
+            json = await response.json();
+          } catch (e) {
+            json = { success: false, error: "Could not reach the server." };
+          }
           if (!json.success) {
-            alert(json.error);
+            bag.setStatus({ error: json.error || "Something went wrong." });
           } else if (devDebug) {
             window.location.reload();
           } else {

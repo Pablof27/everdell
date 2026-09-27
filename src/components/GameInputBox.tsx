@@ -4,6 +4,7 @@ import isEqual from "lodash/isEqual";
 import omit from "lodash/omit";
 
 import styles from "../styles/GameInputBox.module.css";
+import anim from "../styles/animations.module.css";
 import { GameState } from "../model/gameState";
 import { GameInputType, GameInput } from "../model/types";
 import { Player } from "../model/player";
@@ -27,17 +28,87 @@ import GameInputSelectCardWithSourceSelector from "./GameInputSelectCardWithSour
 import GameInputSelectTrainCarTileSelector from "./GameInputSelectTrainCarTileSelector";
 import GameInputVisitorSelector from "./GameInputVisitorSelector";
 import GameInputPlayCard from "./GameInputPlayCard";
+import { BoardSelectionBridge } from "./BoardSelection";
+import PixelSprite, { Sprite } from "./pixel/PixelSprite";
+import * as Sprites from "./pixel/sprites";
+import { SEASON_SPRITES } from "./pixel/icons";
+import { useGameUI } from "./gameUI";
 
 import { assertUnreachable } from "../utils";
 
 const GameInputBoxText: React.FC<{
   title?: string;
   text: string;
-}> = ({ title = "Game Input", text }) => {
+  waiting?: boolean;
+}> = ({ title = "Game Input", text, waiting = false }) => {
   return (
-    <GameBlock title={title}>
-      <p id={"js-game-input-box-text"}>{text}</p>
+    <GameBlock
+      title={title}
+      className={[styles.panel, styles.panel_idle].join(" ")}
+    >
+      <div className={styles.idle}>
+        {waiting && (
+          <PixelSprite
+            sprite={Sprites.HOURGLASS}
+            height="26px"
+            className={anim.hourglass}
+          />
+        )}
+        <p id={"js-game-input-box-text"}>{text}</p>
+      </div>
     </GameBlock>
+  );
+};
+
+const INPUT_ICONS: Partial<Record<GameInputType, Sprite>> = {
+  [GameInputType.PLACE_WORKER]: Sprites.MEEPLE,
+  [GameInputType.PLAY_CARD]: Sprites.CARD,
+  [GameInputType.CLAIM_EVENT]: Sprites.FLAG,
+  [GameInputType.VISIT_DESTINATION_CARD]: Sprites.BADGE_DESTINATION,
+  [GameInputType.GAME_END]: Sprites.CROWN,
+  [GameInputType.PLAY_ADORNMENT]: Sprites.PEARL,
+  [GameInputType.PLACE_AMBASSADOR]: Sprites.FROG_MEEPLE,
+  [GameInputType.RESERVE_CARD]: Sprites.RESERVATION_TOKEN,
+  [GameInputType.PLAY_TRAIN_TICKET]: Sprites.TICKET,
+};
+
+const BOARD_TIPS: Partial<Record<GameInputType, string>> = {
+  [GameInputType.PLACE_WORKER]:
+    "Tip: click a glowing location on the board, then Submit.",
+  [GameInputType.SELECT_LOCATION]:
+    "Tip: click a glowing location on the board, then Submit.",
+  [GameInputType.PLAY_CARD]:
+    "Tip: click a glowing card in the Meadow or your hand, then Submit.",
+  [GameInputType.CLAIM_EVENT]:
+    "Tip: click a glowing event on the board, then Submit.",
+};
+
+const InputTypeIcon: React.FC<{
+  gameInput: GameInput;
+  viewingPlayer: Player;
+}> = ({ gameInput, viewingPlayer }) => {
+  const { getPlayerTheme } = useGameUI();
+  const theme = getPlayerTheme(viewingPlayer.playerId);
+  if (gameInput.inputType === GameInputType.UNDO) {
+    return <span className={styles.tab_glyph}>{"\u21B6"}</span>;
+  }
+  const sprite =
+    gameInput.inputType === GameInputType.PREPARE_FOR_SEASON
+      ? SEASON_SPRITES[viewingPlayer.currentSeason]
+      : INPUT_ICONS[gameInput.inputType];
+  if (!sprite) {
+    return <span className={styles.tab_glyph}>{"\u2726"}</span>;
+  }
+  return (
+    <PixelSprite
+      sprite={sprite}
+      height="20px"
+      colors={
+        sprite === Sprites.MEEPLE || sprite === Sprites.FROG_MEEPLE
+          ? { C: theme.color, D: theme.dark, L: theme.light }
+          : undefined
+      }
+    />
   );
 };
 
@@ -249,7 +320,7 @@ const GameInputBox: React.FC<{
   gameInputs: GameInput[];
   viewingPlayer: Player | null;
 }> = ({
-  title = "Game Input",
+  title = "Actions",
   devDebug = false,
   gameId,
   gameState,
@@ -262,7 +333,11 @@ const GameInputBox: React.FC<{
   }
   if (!viewingPlayer) {
     return (
-      <GameInputBoxText title={title} text={`${activePlayer.name}'s turn`} />
+      <GameInputBoxText
+        title={title}
+        text={`${activePlayer.name}'s turn`}
+        waiting={true}
+      />
     );
   }
   if (gameState.activePlayerId !== viewingPlayer.playerId) {
@@ -270,6 +345,7 @@ const GameInputBox: React.FC<{
       <GameInputBoxText
         title={title}
         text={`Waiting for ${activePlayer.name}`}
+        waiting={true}
       />
     );
   }
@@ -287,7 +363,7 @@ const GameInputBox: React.FC<{
 
   return (
     <GameInputBoxContainer
-      title={title}
+      title={devDebug ? title : "Your turn"}
       gameId={gameId}
       devDebug={devDebug}
       viewingPlayer={viewingPlayer}
@@ -295,7 +371,7 @@ const GameInputBox: React.FC<{
         gameInput: getInitialSelectedGameInput(gameInputs[0], gameState),
       }}
     >
-      {({ values, setFieldValue, isSubmitting }) => {
+      {({ values, setFieldValue, isSubmitting, status }) => {
         const selectedGameInput = values.gameInput;
 
         // For inputs that require selecting multiple things, update the button
@@ -318,55 +394,98 @@ const GameInputBox: React.FC<{
           }
         }
 
+        const selectedIdx = gameInputs.findIndex((gameInput) =>
+          isEqual(
+            omit(values.gameInput, ["clientOptions"]),
+            omit(gameInput, ["clientOptions"])
+          )
+        );
+        const selectedInput =
+          selectedIdx === -1 ? null : gameInputs[selectedIdx];
+        const tip = selectedInput && BOARD_TIPS[selectedInput.inputType];
+        const error = status && status.error;
+
         return (
-          <Form>
-            {false && <pre>{JSON.stringify(values, null, 2)}</pre>}
-            <div role="group">
+          <Form className={styles.form}>
+            {!devDebug && (
+              <BoardSelectionBridge
+                gameInputs={gameInputs}
+                gameState={gameState}
+                viewingPlayer={viewingPlayer}
+              />
+            )}
+            <div role="group" className={styles.tabs}>
               {gameInputs.map((gameInput, idx) => {
-                const isSelected = isEqual(
-                  omit(values.gameInput, ["clientOptions"]),
-                  omit(gameInput, ["clientOptions"])
-                );
+                const isSelected = idx === selectedIdx;
                 return (
-                  <div key={idx} className={styles.input_type_radio}>
-                    <label>
-                      <input
-                        id={`js-game-input-type-${gameInput.inputType}`}
-                        type="radio"
-                        name="selectedInputType"
-                        value={idx}
-                        checked={isSelected}
-                        onChange={() => {
-                          setFieldValue(
-                            "gameInput",
-                            getInitialSelectedGameInput(gameInput, gameState)
-                          );
-                        }}
+                  <label
+                    key={idx}
+                    className={[
+                      styles.input_type_radio,
+                      isSelected && styles.tab_selected,
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
+                    <input
+                      id={`js-game-input-type-${gameInput.inputType}`}
+                      type="radio"
+                      name="selectedInputType"
+                      value={idx}
+                      checked={isSelected}
+                      onChange={() => {
+                        setFieldValue(
+                          "gameInput",
+                          getInitialSelectedGameInput(gameInput, gameState)
+                        );
+                      }}
+                    />
+                    <span className={styles.tab_icon}>
+                      <InputTypeIcon
+                        gameInput={gameInput}
+                        viewingPlayer={viewingPlayer}
                       />
-                      <span className={styles.input_type_radio_span}>
-                        {renderGameInputLabel(gameInput, gameState.gameOptions)}
-                      </span>
-                    </label>
-                    {isSelected && (
-                      <div className={styles.input_type_form_nested}>
-                        <GameInputBoxInner
-                          gameInput={gameInput}
-                          gameState={gameState}
-                          viewingPlayer={viewingPlayer}
-                        />
-                      </div>
-                    )}
-                  </div>
+                    </span>
+                    <span className={styles.input_type_radio_span}>
+                      {renderGameInputLabel(gameInput, gameState.gameOptions)}
+                    </span>
+                  </label>
                 );
               })}
             </div>
-            <button
-              className={styles.button}
-              disabled={isSubmitting}
-              type="submit"
-            >
-              {submitLabel}
-            </button>
+            {selectedInput && (
+              <div
+                key={selectedIdx}
+                className={[styles.input_type_form_nested, anim.fadeIn].join(
+                  " "
+                )}
+              >
+                {tip && !devDebug && <p className={styles.tip}>{tip}</p>}
+                <GameInputBoxInner
+                  gameInput={selectedInput}
+                  gameState={gameState}
+                  viewingPlayer={viewingPlayer}
+                />
+              </div>
+            )}
+            <div className={styles.submit_bar}>
+              {error && (
+                <div
+                  key={error}
+                  className={[styles.error, anim.shake].join(" ")}
+                  role="alert"
+                >
+                  {error}
+                </div>
+              )}
+              <button
+                className={["px-btn", styles.button].join(" ")}
+                disabled={isSubmitting}
+                type="submit"
+              >
+                {isSubmitting ? "..." : submitLabel}
+              </button>
+            </div>
           </Form>
         );
       }}

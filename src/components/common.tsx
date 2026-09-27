@@ -1,5 +1,4 @@
 import * as React from "react";
-import Image from "next/legacy/image";
 
 import styles from "../styles/common.module.css";
 import { Event } from "../model/event";
@@ -14,208 +13,114 @@ import {
   CardType,
 } from "../model/types";
 import { assertUnreachable } from "../utils";
+import PixelSprite from "./pixel/PixelSprite";
+import {
+  FillSprite,
+  RESOURCE_SPRITES,
+  CARD_TYPE_SPRITES,
+} from "./pixel/icons";
+import * as Sprites from "./pixel/sprites";
+import { useGameUI, playerThemeStyle } from "./gameUI";
 
-export const GameBlockTitle: React.FC = ({ children }) => {
+export const GameBlockTitle: React.FC<{ icon?: React.ReactNode }> = ({
+  icon,
+  children,
+}) => {
   return (
     <div id={"js-game-block-title"} className={styles.title}>
-      {children}
+      {icon}
+      <span>{children}</span>
     </div>
   );
 };
 
-export const GameBlock: React.FC<{ title: string; id?: string }> = ({
-  title,
-  id,
-  children,
-}) => {
+export const GameBlock: React.FC<{
+  title: string;
+  id?: string;
+  icon?: React.ReactNode;
+  className?: string;
+  actions?: React.ReactNode;
+}> = ({ title, id, icon, className, actions, children }) => {
   return (
-    <div id={id} className={styles.block}>
-      <GameBlockTitle>{title}</GameBlockTitle>
+    <div id={id} className={[styles.block, className].filter(Boolean).join(" ")}>
+      <div className={styles.block_header}>
+        <GameBlockTitle icon={icon}>{title}</GameBlockTitle>
+        {actions}
+      </div>
       {children}
     </div>
   );
 };
 
 export const CardTypeSymbol = ({ cardType }: { cardType: CardType }) => {
+  const sprite = CARD_TYPE_SPRITES[cardType];
   return (
-    <span>
+    <span className={styles.fill}>
       <span className={styles.hidden}>{cardType}</span>
-      <span aria-hidden={true}>
-        {cardType === CardType.PRODUCTION ? (
-          <Image
-            alt="PRODUCTION card type"
-            src="/images/production.png"
-            layout="fill"
-          />
-        ) : cardType === CardType.GOVERNANCE ? (
-          <Image
-            alt="GOVERNANCE card type"
-            src="/images/governance.png"
-            layout="fill"
-          />
-        ) : cardType === CardType.DESTINATION ? (
-          <Image
-            alt="DESTINATION card type"
-            src="/images/destination.png"
-            layout="fill"
-          />
-        ) : cardType === CardType.PROSPERITY ? (
-          <Image
-            alt="PROSPERITY card type"
-            src="/images/prosperity.png"
-            layout="fill"
-          />
-        ) : cardType === CardType.TRAVELER ? (
-          <Image
-            alt="TRAVELER card type"
-            src="/images/traveler.png"
-            layout="fill"
-          />
-        ) : (
-          <>{cardType}</>
-        )}
-      </span>
+      {sprite ? <FillSprite sprite={sprite} /> : <>{cardType}</>}
     </span>
   );
 };
 
-export const CardIcon = () => {
-  return (
-    <Image alt="Card Icon" src="/images/card.png" layout="fill" priority />
-  );
-};
+export const CardIcon = () => <FillSprite sprite={Sprites.CARD} />;
 
-export const GoldenLeafIcon = () => {
-  return (
-    <Image
-      alt="Golden Leaf Icon"
-      src="/images/gold_occupied.png"
-      layout="fill"
-    />
-  );
-};
+export const GoldenLeafIcon = () => <FillSprite sprite={Sprites.GOLDEN_LEAF} />;
 
-export const TicketIcon = () => {
-  return <Image alt="Ticket Icon" src="/images/ticket.png" layout="fill" />;
-};
+export const TicketIcon = () => <FillSprite sprite={Sprites.TICKET} />;
 
-export const ReservationTokenIcon = () => {
-  return (
-    <Image
-      alt="Ticket Icon"
-      src="/images/reservation_token.png"
-      layout="fill"
-    />
-  );
-};
+export const ReservationTokenIcon = () => (
+  <FillSprite sprite={Sprites.RESERVATION_TOKEN} />
+);
 
-export const AdornmentCardIcon = () => {
-  return (
-    <Image
-      alt="Adornment Card Icon"
-      src="/images/adornment_card.png"
-      layout="fill"
-    />
-  );
-};
+const ADORNMENT_CARD_COLORS = { L: "#fbd7e0", B: "#c75b7a", g: "#ffffff", G: "#aebfd8" };
 
-export const WorkerSpotIcon = ({ locked = false }: { locked?: boolean }) => {
-  if (locked) {
-    return (
-      <Image
-        alt="Worker Spot (Locked)"
-        src="/images/worker_spot_locked.png"
-        layout="fill"
-      />
-    );
-  } else {
-    return (
-      <Image alt="Worker Spot" src="/images/worker_spot.png" layout="fill" />
-    );
-  }
-};
+export const AdornmentCardIcon = () => (
+  <FillSprite sprite={Sprites.CARD} colors={ADORNMENT_CARD_COLORS} />
+);
 
-export const AmbassadorSpotIcon = () => {
-  return (
-    <Image
-      alt="Ambassador Spot"
-      src="/images/ambassador_spot.png"
-      layout="fill"
-    />
-  );
-};
+const LOCKED_PAW_COLORS = { P: "#d9d2c3", o: "#9c8f7a" };
 
-export const EmptyCitySpotIcon = () => {
-  return (
-    <Image alt="Empty City Spot" src="/images/city_slot.png" layout="fill" />
-  );
-};
+export const WorkerSpotIcon = ({ locked = false }: { locked?: boolean }) => (
+  <FillSprite
+    sprite={Sprites.PAW}
+    colors={locked ? LOCKED_PAW_COLORS : undefined}
+  />
+);
 
-export const VPIcon = () => {
-  return <Image alt="VP Token" src="/images/vp.png" layout="fill" />;
-};
+const EMPTY_AMBASSADOR_COLORS = { C: "#cfe8d6", D: "#9cc5a8", L: "#f3f7ef" };
+
+export const AmbassadorSpotIcon = () => (
+  <FillSprite sprite={Sprites.FROG_MEEPLE} colors={EMPTY_AMBASSADOR_COLORS} />
+);
+
+export const EmptyCitySpotIcon = () => <FillSprite sprite={Sprites.HUT} />;
+
+export const VPIcon = () => <FillSprite sprite={Sprites.VP} />;
+
+const PLAIN_COIN_COLORS = { S: "#f7c948", W: "#f7c948" };
 
 export const Points = ({ numPoints }: { numPoints: number }) => {
   return (
-    <div className={styles.points}>
-      <span>{numPoints}</span>
-    </div>
+    <span className={styles.points}>
+      <PixelSprite
+        sprite={Sprites.VP}
+        colors={PLAIN_COIN_COLORS}
+        className={styles.points_coin}
+      />
+      <span className={styles.points_value}>{numPoints}</span>
+    </span>
   );
 };
 
-export const WildResourceIcon = () => {
-  return (
-    <Image alt="WILD Resource" src="/images/wild_resource.png" layout="fill" />
-  );
-};
+export const WildResourceIcon = () => <FillSprite sprite={Sprites.ANY} />;
 
 export const ResourceTypeIcon = ({
   resourceType,
 }: {
   resourceType: ResourceType;
 }) => {
-  return (
-    <>
-      {resourceType === ResourceType.BERRY ? (
-        <Image
-          alt="BERRY Resource"
-          src="/images/berry.png"
-          layout="fill"
-          priority
-        />
-      ) : resourceType === ResourceType.TWIG ? (
-        <Image
-          alt="TWIG Resource"
-          src="/images/twig.png"
-          layout="fill"
-          priority
-        />
-      ) : resourceType === ResourceType.PEBBLE ? (
-        <Image
-          alt="PEBBLE Resource"
-          src="/images/pebble.png"
-          layout="fill"
-          priority
-        />
-      ) : resourceType === ResourceType.RESIN ? (
-        <Image
-          alt="RESIN Resource"
-          src="/images/resin.png"
-          layout="fill"
-          priority
-        />
-      ) : resourceType === ResourceType.PEARL ? (
-        <Image
-          alt="PEARL Resource"
-          src="/images/pearl.png"
-          layout="fill"
-          priority
-        />
-      ) : (
-        <>{resourceType}</>
-      )}
-    </>
-  );
+  const sprite = RESOURCE_SPRITES[resourceType];
+  return sprite ? <FillSprite sprite={sprite} /> : <>{resourceType}</>;
 };
 
 export const GameIcon = ({
@@ -232,8 +137,8 @@ export const GameIcon = ({
     | "GOLDEN_LEAF";
 }) => {
   return (
-    <div className={styles.resource}>
-      <div className={styles.resource_inner}>
+    <span className={styles.resource}>
+      <span className={styles.resource_inner}>
         {type === "CARD" ? (
           <CardIcon />
         ) : type === "VP" ? (
@@ -253,8 +158,20 @@ export const GameIcon = ({
         ) : (
           type
         )}
-      </div>
-    </div>
+      </span>
+    </span>
+  );
+};
+
+const PlayerNamePart: React.FC<{ name: string }> = ({ name }) => {
+  const { getPlayerThemeByName } = useGameUI();
+  return (
+    <span
+      className={styles.player_part}
+      style={playerThemeStyle(getPlayerThemeByName(name))}
+    >
+      {name}
+    </span>
   );
 };
 
@@ -310,11 +227,7 @@ export const Description = ({ textParts }: { textParts: GameText }) => {
               </span>
             );
           case "player":
-            return (
-              <span key={idx} className={styles.player_part}>
-                {part.name}
-              </span>
-            );
+            return <PlayerNamePart key={idx} name={part.name} />;
           case "entity":
             if (part.entityType === "event") {
               return (
@@ -403,24 +316,44 @@ export const Description = ({ textParts }: { textParts: GameText }) => {
 };
 
 export const ItemWrapper: React.FC<{
+  // Dims the item (eg. occupied location, claimed event).
   isHighlighted?: boolean;
+  isSelected?: boolean;
   footerChildren?: any;
-}> = ({ isHighlighted = false, footerChildren = null, children }) => {
+  className?: string;
+}> = ({
+  isHighlighted = false,
+  isSelected = false,
+  footerChildren = null,
+  className,
+  children,
+}) => {
   return (
-    <div className={styles.item_wrapper}>
-      <div className={isHighlighted ? styles.item_highlighted : undefined}>
+    <div
+      className={[styles.item_wrapper, className].filter(Boolean).join(" ")}
+    >
+      <div
+        className={
+          [
+            styles.item_inner,
+            isHighlighted && styles.item_highlighted,
+            isSelected && styles.item_selected,
+          ]
+            .filter(Boolean)
+            .join(" ") || undefined
+        }
+      >
         {children}
+        {isSelected && (
+          <span className={styles.item_check} aria-hidden={true}>
+            ✓
+          </span>
+        )}
       </div>
-      <div className={styles.item_footer}>{footerChildren}</div>
+      {footerChildren ? (
+        <div className={styles.item_footer}>{footerChildren}</div>
+      ) : null}
     </div>
-  );
-};
-
-export const InfoIconSvg = () => {
-  return (
-    <svg fill="#000000" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-      <path d="M 12 0 C 5.371094 0 0 5.371094 0 12 C 0 18.628906 5.371094 24 12 24 C 18.628906 24 24 18.628906 24 12 C 24 5.371094 18.628906 0 12 0 Z M 12 2 C 17.523438 2 22 6.476563 22 12 C 22 17.523438 17.523438 22 12 22 C 6.476563 22 2 17.523438 2 12 C 2 6.476563 6.476563 2 12 2 Z M 12 5.8125 C 11.816406 5.8125 11.664063 5.808594 11.5 5.84375 C 11.335938 5.878906 11.183594 5.96875 11.0625 6.0625 C 10.941406 6.15625 10.851563 6.285156 10.78125 6.4375 C 10.710938 6.589844 10.6875 6.769531 10.6875 7 C 10.6875 7.226563 10.710938 7.40625 10.78125 7.5625 C 10.851563 7.71875 10.941406 7.84375 11.0625 7.9375 C 11.183594 8.03125 11.335938 8.085938 11.5 8.125 C 11.664063 8.164063 11.816406 8.1875 12 8.1875 C 12.179688 8.1875 12.371094 8.164063 12.53125 8.125 C 12.691406 8.085938 12.816406 8.03125 12.9375 7.9375 C 13.058594 7.84375 13.148438 7.71875 13.21875 7.5625 C 13.289063 7.410156 13.34375 7.226563 13.34375 7 C 13.34375 6.769531 13.289063 6.589844 13.21875 6.4375 C 13.148438 6.285156 13.058594 6.15625 12.9375 6.0625 C 12.816406 5.96875 12.691406 5.878906 12.53125 5.84375 C 12.371094 5.808594 12.179688 5.8125 12 5.8125 Z M 10.78125 9.15625 L 10.78125 18.125 L 13.21875 18.125 L 13.21875 9.15625 Z" />
-    </svg>
   );
 };
 
@@ -429,18 +362,24 @@ export const CardWithSourceFooter = ({
 }: {
   cardWithSource: CardWithSource | "FROM_DECK";
 }) => {
+  const source =
+    cardWithSource === "FROM_DECK" ? "DECK" : cardWithSource.source;
   return (
-    <div className={styles.item_footer_text}>
+    <div
+      className={[styles.item_footer_text, styles[`source_${source}`]].join(
+        " "
+      )}
+    >
       {cardWithSource === "FROM_DECK"
         ? "From Deck"
         : cardWithSource.source === "MEADOW"
-        ? "(Meadow)"
+        ? "Meadow"
         : cardWithSource.source === "STATION"
-        ? `(Station ${cardWithSource.sourceIdx! + 1})`
+        ? `Station ${cardWithSource.sourceIdx! + 1}`
         : cardWithSource.source === "RESERVED"
-        ? "(Reserved)"
+        ? "Reserved"
         : cardWithSource.source === "HAND"
-        ? " "
+        ? "Hand"
         : assertUnreachable(cardWithSource.source, "Unexpected source")}
     </div>
   );

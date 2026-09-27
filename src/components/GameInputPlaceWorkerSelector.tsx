@@ -29,7 +29,7 @@ const GameInputPlaceWorkerSelector: React.FC<{
                 helpers.setValue(location);
               }}
             >
-              <ItemWrapper isHighlighted={isSelected}>
+              <ItemWrapper isSelected={isSelected}>
                 <Location name={location} />
               </ItemWrapper>
             </div>

@@ -54,7 +54,7 @@ function GameInputSelectItemWrapper<T = any>({
               }
             }}
           >
-            <ItemWrapper isHighlighted={isSelected}>
+            <ItemWrapper isSelected={isSelected}>
               {renderItem(item)}
             </ItemWrapper>
           </div>

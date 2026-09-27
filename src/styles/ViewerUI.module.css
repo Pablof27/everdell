@@ -1,6 +1,208 @@
-.cards {
-  margin-left: -10px;
+.dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
   display: flex;
-  flex-wrap: wrap;
-  width: 880px;
+  align-items: stretch;
+  gap: 14px;
+  height: var(--dock-h, 168px);
+  padding: 0 14px 0 18px;
+  background: repeating-linear-gradient(
+      180deg,
+      transparent 0 26px,
+      rgba(0, 0, 0, 0.12) 26px 29px
+    ),
+    linear-gradient(180deg, var(--wood-light), var(--wood));
+  box-shadow: 0 -3px 0 0 var(--wood-dark), 0 -4px 0 0 var(--player-color),
+    0 -12px 0 0 rgba(0, 0, 0, 0.14);
+}
+
+.dock_label {
+  position: absolute;
+  top: 6px;
+  left: 4px;
+  z-index: 0;
+  font-family: var(--font-pixel);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff8e7;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
+}
+
+.dock_label b {
+  font-weight: 400;
+  color: var(--glow);
+}
+
+.hand_area {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.hand {
+  display: flex;
+  align-items: flex-start;
+  height: 100%;
+  padding: 28px 150px 0 4px;
+  --card-font: 9.5px;
+}
+
+.empty_hand {
+  padding-top: 26px;
+  font-family: var(--font-pixel);
+  font-size: 14px;
+  color: rgba(255, 248, 231, 0.7);
+}
+
+.hand_slot {
+  position: relative;
+  flex: 0 1 15.4em;
+  min-width: 34px;
+  font-size: 9.5px;
+  transform: translateY(var(--fan-y, 0)) rotate(var(--fan-rot, 0deg));
+  transform-origin: 50% 100%;
+  transition: transform 160ms cubic-bezier(0.2, 0.8, 0.3, 1.2);
+}
+
+.hand_slot > div {
+  width: 15em;
+}
+
+.hand_slot:hover,
+.hand_slot:focus-within {
+  z-index: 60 !important;
+  transform: translateY(-104px) scale(1.12) rotate(0deg);
+}
+
+.hand_adornment {
+  position: relative;
+  flex: 0 1 150px;
+  min-width: 40px;
+  padding-top: 4px;
+  --adornment-width: 140px;
+  transition: transform 160ms ease-out;
+}
+
+.hand_adornment:hover {
+  z-index: 60;
+  transform: translateY(-80px);
+}
+
+.reserved_area {
+  position: relative;
+  flex: none;
+  width: 160px;
+  --card-font: 9.5px;
+}
+
+.reserved_area .hand_slot {
+  position: absolute;
+  top: 28px;
+  left: 4px;
+}
+
+.tray {
+  flex: none;
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  color: var(--ink);
+  background: var(--parchment);
+  box-shadow: inset 5px 0 0 0 var(--player-color),
+    0 -3px 0 0 var(--wood-dark), 0 3px 0 0 var(--wood-dark),
+    -3px 0 0 0 var(--wood-dark), 3px 0 0 0 var(--wood-dark),
+    0 6px 0 0 rgba(0, 0, 0, 0.25);
+}
+
+.tray_resources {
+  display: flex;
+  gap: 10px;
+  padding-left: 4px;
+}
+
+.tray_resource {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tray_value {
+  min-width: 1.1em;
+  font-family: var(--font-pixel);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.tray_row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 4px;
+}
+
+.tray_chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-pixel);
+  font-size: 15px;
+  line-height: 1;
+}
+
+.city_button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  padding: 4px 8px 5px;
+  border: 0;
+  font-family: var(--font-pixel);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff8e7;
+  background: var(--wood);
+  cursor: pointer;
+  box-shadow: 0 -2px 0 0 var(--wood-dark), 0 2px 0 0 var(--wood-dark),
+    -2px 0 0 0 var(--wood-dark), 2px 0 0 0 var(--wood-dark),
+    inset 0 2px 0 0 rgba(255, 255, 255, 0.2);
+}
+
+.city_button b {
+  font-weight: 400;
+  color: var(--glow);
+}
+
+.city_button:hover {
+  background: var(--wood-light);
+}
+
+@media (max-width: 900px) {
+  .dock {
+    gap: 8px;
+    padding: 0 8px;
+  }
+
+  .tray_resources {
+    gap: 6px;
+  }
+
+  .tray_value {
+    font-size: 17px;
+  }
+
+  .reserved_area {
+    width: 120px;
+  }
+
+  .hand {
+    padding-right: 120px;
+  }
 }

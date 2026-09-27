@@ -1,0 +1,21 @@
+@keyframes zoomIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.zoom {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  --card-font: 14px;
+  --event-font: 14px;
+  --event-width: 16em;
+  filter: drop-shadow(0 10px 0 rgba(0, 0, 0, 0.28));
+  animation: zoomIn 140ms ease-out both;
+}

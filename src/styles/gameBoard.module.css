@@ -1,119 +1,387 @@
+/* ---- Shared by the action-panel selectors ---- */
+
 .items {
-  margin-left: -10px;
   display: flex;
   flex-flow: row wrap;
-}
-
-.river_items {
-  margin-left: -10px;
-  display: flex;
-}
-
-.event_items {
-  margin-left: -10px;
-  display: flex;
-}
-
-.event_items_col {
-  display: flex;
-  flex-direction: column;
-}
-
-.radio_item {
-  cursor: pointer;
-  margin-right: 10px;
-}
-
-.items_no_wrap {
-  margin-left: -10px;
-  display: flex;
-}
-
-.empty_city {
-  font-size: 14px;
-  padding: 20px 0;
-}
-
-.city_stats {
-  font-size: 14px;
-  padding-top: 5px;
-  padding-bottom: 15px;
-  margin-left: -5px;
-  color: #999;
-}
-
-.city_stat {
-  display: inline-block;
-  padding: 0 5px;
-}
-
-.location_items {
-  margin-left: -10px;
-  display: flex;
-  flex-flow: row wrap;
-  width: 840px;
-}
-
-.game_board {
-  display: flex;
-  justify-content: space-between;
-}
-
-.forest_locations {
-  height: auto;
-  margin-left: -10px;
-  display: flex;
-  flex-direction: column;
-}
-
-.station_visitors {
-  height: auto;
-  margin-left: -10px;
-  display: flex;
-  flex-direction: column;
-}
-
-.forest_locations_newleaf {
-  height: auto;
-  margin-left: -10px;
-  display: flex;
-  flex-direction: row;
-}
-
-.forest_locations > div {
-  min-height: 120px;
+  margin: 0 -5px;
 }
 
 .clickable {
   cursor: pointer;
+  transition: transform 120ms ease-out;
 }
 
-.locations_and_events {
+.clickable:hover {
+  transform: translateY(-3px);
+}
+
+.radio_item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 5px;
+  padding: 7px 12px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #2a1a0e;
+  background: #fff8e7;
+  box-shadow: 0 -2px 0 0 #2a1a0e, 0 2px 0 0 #2a1a0e, -2px 0 0 0 #2a1a0e,
+    2px 0 0 0 #2a1a0e, 0 5px 0 0 rgba(0, 0, 0, 0.2);
+  transition: transform 100ms ease-out;
+}
+
+.radio_item:hover {
+  transform: translateY(-2px);
+  background: #fff3c4;
+}
+
+.radio_item input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--wood);
+}
+
+/* ---- Board ---- */
+
+.board {
+  container-type: inline-size;
+  container-name: board;
+  position: relative;
   display: flex;
-  flex-direction: row;
-  justify-items: flex-start;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding: 4px 6px 24px;
+}
+
+.board > section,
+.board > div {
+  position: relative;
+  z-index: 1;
+}
+
+.section_label {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: var(--font-pixel);
+  font-size: 13px;
+  line-height: 1.1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #fff8e7;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
+}
+
+.section_label small {
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+/* Basic locations sit on a river bank, like signposts along the stream. */
+@keyframes flow {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 48px 0;
+  }
+}
+
+.riverbank {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 36px 12px 12px;
+  background: linear-gradient(
+    180deg,
+    transparent 0 30px,
+    var(--dirt-dark) 30px 34px,
+    var(--dirt) 34px 38px,
+    rgba(201, 162, 106, 0.5) 38px 100%
+  );
+  box-shadow: inset 0 -4px 0 0 rgba(0, 0, 0, 0.1);
+}
+
+.riverbank::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 30px;
+  background-color: var(--water-2);
+  background-image: var(--water-tile);
+  background-size: 48px 24px;
+  box-shadow: inset 0 3px 0 0 rgba(255, 255, 255, 0.25),
+    inset 0 -3px 0 0 var(--water-3);
+  animation: flow 4s linear infinite;
+}
+
+.riverbank > .section_label {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+}
+
+.basic_row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
+  gap: 2px 4px;
+  --location-font: 10px;
+  --location-width: 100%;
+  --location-min-height: 5.8em;
+}
+
+.clearing {
+  display: grid;
+  grid-template-columns: minmax(112px, 14%) minmax(0, 1fr) minmax(112px, 14%);
+  grid-template-areas: "left meadow right";
+  gap: 12px;
+  align-items: start;
+}
+
+.side_col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  --location-width: 100%;
+  --location-font: 10.5px;
+  --location-min-height: 6em;
+}
+
+.side_left {
+  grid-area: left;
+}
+
+.side_right {
+  grid-area: right;
+}
+
+.side_col > div[data-location] > div {
+  margin-left: 3px;
+  margin-right: 3px;
+}
+
+.meadow_block {
+  grid-area: meadow;
+  padding: 8px 12px 16px;
+  background: rgba(40, 70, 20, 0.16);
+  box-shadow: inset 0 0 0 3px rgba(40, 70, 20, 0.18);
+}
+
+.meadow_grid {
+  container-type: inline-size;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px 10px;
+  --card-width: 100%;
+}
+
+.meadow_grid > .board_card {
+  --card-font: clamp(8px, calc((100cqi - 30px) / 60), 13px);
+}
+
+@container board (max-width: 740px) {
+  .clearing {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "meadow meadow"
+      "left right";
+  }
+}
+
+.board_card {
+  position: relative;
+  min-width: 0;
+}
+
+.board_card_inner {
+  transition: transform 120ms ease-out;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 0 rgba(255, 228, 92, 0));
+  }
+  50% {
+    filter: drop-shadow(0 0 5px rgba(255, 228, 92, 1))
+      drop-shadow(0 0 2px rgba(255, 255, 255, 0.9));
+  }
+}
+
+.playable {
+  cursor: pointer;
+}
+
+.playable .board_card_inner {
+  animation: breathe 1.8s ease-in-out infinite;
+}
+
+.playable:hover .board_card_inner,
+.playable:focus-visible .board_card_inner {
+  transform: translateY(-4px);
+  animation: none;
+  filter: drop-shadow(3px 0 0 var(--glow)) drop-shadow(-3px 0 0 var(--glow))
+    drop-shadow(0 3px 0 var(--glow)) drop-shadow(0 -3px 0 var(--glow));
+}
+
+.playable:focus-visible {
+  outline: none;
+}
+
+.selected_card .board_card_inner,
+.selected_card:hover .board_card_inner {
+  transform: translateY(-7px);
+  animation: none;
+  filter: drop-shadow(4px 0 0 #fff) drop-shadow(-4px 0 0 #fff)
+    drop-shadow(0 4px 0 #fff) drop-shadow(0 -4px 0 #fff)
+    drop-shadow(0 0 6px var(--glow));
+}
+
+.play_badge {
+  position: absolute;
+  left: 50%;
+  bottom: -9px;
+  z-index: 3;
+  padding: 1px 8px 2px;
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #2a1a0e;
+  background: var(--glow);
+  box-shadow: 0 -2px 0 0 #2a1a0e, 0 2px 0 0 #2a1a0e, -2px 0 0 0 #2a1a0e,
+    2px 0 0 0 #2a1a0e;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.selected_card .play_badge {
+  background: #fff;
+}
+
+.play_badge_top {
+  top: -11px;
+  bottom: auto;
+}
+
+.journey {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.journey_list {
+  display: flex;
+  flex-direction: column;
+  --location-font: 10px;
+}
+
+.journey_list > div > div {
+  margin: 3px;
+}
+
+.events_block {
+  padding-top: 4px;
+}
+
+.event_items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 4px;
+  --event-font: 10px;
+  --event-width: 12.4em;
+  --event-min-height: 6.4em;
+}
+
+.event_item {
+  min-width: 0;
+}
+
+.river_block {
+  padding: 10px 12px 14px;
+  background-color: var(--water-2);
+  background-image: var(--water-tile);
+  background-size: 48px 24px;
+  box-shadow: inset 0 4px 0 0 rgba(255, 255, 255, 0.25),
+    inset 0 -4px 0 0 var(--water-3);
+  animation: flow 5s linear infinite;
+}
+
+.river_items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  --river-width: 148px;
+}
+
+.expansion_row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
 }
 
 .station_cards {
-  flex-direction: column;
-  gap: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
 }
 
 .station_card {
   display: flex;
-  gap: 6px;
-  flex-direction: row;
   align-items: center;
+  gap: 8px;
+  --card-font: 8.5px;
 }
 
-.visitor_styles {
-  height: auto;
-  margin-left: -10px;
+.station_visitors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 4px;
+  --location-width: 15em;
+}
+
+/* ---- Cities ---- */
+
+.city {
   display: flex;
   flex-direction: column;
+  gap: 10px;
+}
+
+.city_stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.city_stat {
+  padding: 2px 8px;
+  font-size: 12px;
+  color: #2a1a0e;
+  background: #fff8e7;
+  box-shadow: 0 -2px 0 0 #2a1a0e, 0 2px 0 0 #2a1a0e, -2px 0 0 0 #2a1a0e,
+    2px 0 0 0 #2a1a0e;
+}
+
+.empty_city {
+  padding: 16px 4px;
+  font-family: var(--font-pixel);
+  font-size: 15px;
+  opacity: 0.8;
 }
 
 .visitor_meta_data {
   margin: 5px 0;
-  font-size: 10px;
+  font-size: 11px;
+  font-weight: 700;
 }

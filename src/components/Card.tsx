@@ -11,21 +11,91 @@ import {
 import { Player } from "../model/player";
 import { resourceMapToGameText, toGameText } from "../model/gameText";
 import {
-  GameIcon,
   AmbassadorSpotIcon,
   WorkerSpotIcon,
   Description,
   CardTypeSymbol,
+  ResourceTypeIcon,
+  Points,
 } from "./common";
 import { sumResources } from "../model/gameStatePlayHelpers";
 import { assertUnreachable } from "../utils";
+import PixelSprite, { Sprite } from "./pixel/PixelSprite";
+import { Meeple } from "./pixel/icons";
+import * as Sprites from "./pixel/sprites";
+import { useGameUI, playerThemeStyle } from "./gameUI";
 
-const colorClassMap = {
-  GOVERNANCE: styles.color_governance,
-  PROSPERITY: styles.color_prosperity,
-  PRODUCTION: styles.color_production,
-  DESTINATION: styles.color_destination,
-  TRAVELER: styles.color_traveler,
+const typeClassMap: Record<CardType, string> = {
+  GOVERNANCE: styles.type_governance,
+  PROSPERITY: styles.type_prosperity,
+  PRODUCTION: styles.type_production,
+  DESTINATION: styles.type_destination,
+  TRAVELER: styles.type_traveler,
+};
+
+function hashString(str: string): number {
+  let hash = 7;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 31 + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash);
+}
+
+const CRITTER_KINDS = Object.keys(Sprites.CRITTERS) as Sprites.CritterKind[];
+
+const CRITTER_FOR_CARD: Partial<Record<CardName, Sprites.CritterKind>> = {
+  [CardName.BARGE_TOAD]: "frog",
+  [CardName.MINER_MOLE]: "mouse",
+  [CardName.CHIP_SWEEP]: "squirrel",
+  [CardName.FERRY_FERRET]: "mouse",
+  [CardName.HISTORIAN]: "turtle",
+};
+
+const FUR_VARIANTS: Record<
+  Sprites.CritterKind,
+  Record<string, string>[]
+> = {
+  squirrel: [{}, { F: "#9aa3ad", D: "#6b737c" }, { F: "#b0773f", D: "#6b4526" }],
+  mouse: [{}, { F: "#b08a64", D: "#7d5f41" }, { F: "#e8e1d3", D: "#b8ae9b" }],
+  hedgehog: [{}, { S: "#4a3a2e", s: "#6b5646" }],
+  turtle: [{}, { F: "#5fb3a1", D: "#3b7f72" }],
+  frog: [{}, { F: "#5fb3a1", D: "#3b7f72" }, { F: "#b5cf49", D: "#7e9a2a" }],
+};
+
+const BUILDING_FOR_TYPE: Record<CardType, Sprite> = {
+  PRODUCTION: Sprites.BARN,
+  DESTINATION: Sprites.COTTAGE,
+  GOVERNANCE: Sprites.TOWER,
+  PROSPERITY: Sprites.CASTLE,
+  TRAVELER: Sprites.COTTAGE,
+};
+
+// Pixel illustration: a critter portrait or a building tinted by card type.
+const CardArt = ({ card }: { card: CardModel }) => {
+  if (card.name === CardName.EVERTREE) {
+    return <PixelSprite sprite={Sprites.EVERTREE} height="100%" />;
+  }
+  const hash = hashString(card.name);
+  if (card.isCritter) {
+    const kind =
+      CRITTER_FOR_CARD[card.name] || CRITTER_KINDS[hash % CRITTER_KINDS.length];
+    const variants = FUR_VARIANTS[kind];
+    return (
+      <PixelSprite
+        sprite={Sprites.CRITTERS[kind]}
+        colors={variants[(hash >> 3) % variants.length]}
+        height="100%"
+      />
+    );
+  }
+  const typeColors = Sprites.TYPE_COLORS[card.cardType];
+  return (
+    <PixelSprite
+      sprite={BUILDING_FOR_TYPE[card.cardType]}
+      colors={{ R: typeColors.C, D: typeColors.D }}
+      height="100%"
+    />
+  );
 };
 
 function romanize(num: number): string {
@@ -152,12 +222,14 @@ const AssociatedCard = ({
   card: CardModel;
   usedForCritter?: boolean;
 }) => {
-  const colorClass = colorClassMap[card.cardType];
   const associatedCard = getAssociatedCard(card);
   return (
     <div
       className={[
         styles.associated_card,
+        card.isCritter
+          ? styles.associated_card_critter
+          : styles.associated_card_construction,
         usedForCritter && styles.associated_card_used,
         card.associatedCard.type === "GOLDEN_LEAF" &&
           styles.associated_card_golden_leaf,
@@ -165,85 +237,104 @@ const AssociatedCard = ({
         .filter(Boolean)
         .join(" ")}
     >
-      <span
-        className={
-          card.isCritter
-            ? styles.color_associated_card_critter
-            : card.associatedCard.type === "GOLDEN_LEAF"
-            ? styles.color_associated_card_gold
-            : colorClass
-        }
-      >
-        {associatedCard}
-      </span>
+      <span>{associatedCard}</span>
     </div>
   );
 };
 
-const Card: React.FC<{ name: CardName; usedForCritter?: boolean }> = ({
-  name,
-  usedForCritter = false,
+const WorkerSpots = ({
+  card,
+  workers,
+  ambassador,
+}: {
+  card: CardModel;
+  workers?: string[];
+  ambassador?: string | null;
 }) => {
+  const { getPlayerTheme } = useGameUI();
+  if (card.name === CardName.FERRY) {
+    return (
+      <div className={styles.spots}>
+        <span className={styles.spot}>
+          {ambassador ? (
+            <Meeple frog theme={getPlayerTheme(ambassador)} height="100%" />
+          ) : (
+            <AmbassadorSpotIcon />
+          )}
+        </span>
+      </div>
+    );
+  }
+  if (card.maxWorkerSpots === 0) {
+    return null;
+  }
+  const spots = [];
+  for (let i = 0; i < card.maxWorkerSpots; i++) {
+    const workerId = workers && workers[i];
+    spots.push(
+      <span key={i} className={styles.spot}>
+        {workerId ? (
+          <Meeple theme={getPlayerTheme(workerId)} height="100%" />
+        ) : (
+          <WorkerSpotIcon locked={i > 0} />
+        )}
+      </span>
+    );
+  }
+  return <div className={styles.spots}>{spots}</div>;
+};
+
+const Card: React.FC<{
+  name: CardName;
+  usedForCritter?: boolean;
+  // Player ids of workers / ambassador currently on this (played) card.
+  workers?: string[];
+  ambassador?: string | null;
+}> = ({ name, usedForCritter = false, workers, ambassador = null }) => {
   const card = CardModel.fromName(name as any);
-  const colorClass = colorClassMap[card.cardType];
   const rarityLabel = getRarityLabel(card);
   return (
-    <div className={styles.card}>
-      <div className={styles.card_header_row}>
-        <div className={[styles.circle, styles.card_header_symbol].join(" ")}>
+    <div
+      className={[
+        styles.card,
+        typeClassMap[card.cardType],
+        card.isCritter ? styles.is_critter : styles.is_construction,
+      ].join(" ")}
+    >
+      <div className={styles.header}>
+        <span className={styles.type_badge}>
           <CardTypeSymbol cardType={card.cardType} />
-        </div>
-        <div
-          className={[
-            styles.circle,
-            styles.color_victory_point,
-            styles.card_header_vp,
-          ].join(" ")}
-        >
-          <span className={styles.card_header_vp_number}>{card.baseVP}</span>
-        </div>
-        <div className={[styles.card_header, colorClass].join(" ")}>
-          <span>{name}</span>
-          {card.expansion && (
-            <span className={styles.expansion}>{card.expansion}</span>
-          )}
-        </div>
+        </span>
+        <span className={styles.name}>{name}</span>
+        <span className={styles.vp}>
+          <Points numPoints={card.baseVP} />
+        </span>
       </div>
-      <div className={styles.info_row}>
-        <div className={styles.card_cost}>
+      <div className={styles.art}>
+        <div className={styles.cost}>
           {Object.entries(card.baseCost).map(([resourceType, count], idx) => {
             return (
-              <div className={styles.card_cost_item} key={idx}>
-                <GameIcon type={resourceType as ResourceType} />
-                <span className={styles.card_cost_value}> {count}</span>
-              </div>
+              <span className={styles.cost_item} key={idx}>
+                <span className={styles.cost_icon}>
+                  <ResourceTypeIcon resourceType={resourceType as ResourceType} />
+                </span>
+                <span className={styles.cost_value}>{count}</span>
+              </span>
             );
           })}
         </div>
-        {card.name === CardName.FERRY && (
-          <div className={styles.worker_spot_row}>
-            <div className={styles.worker_spot}>
-              <AmbassadorSpotIcon />
-            </div>
-          </div>
-        )}
-        {card.maxWorkerSpots !== 0 && (
-          <div className={styles.worker_spot_row}>
-            <div className={styles.worker_spot}>
-              <WorkerSpotIcon />
-            </div>
-            {card.maxWorkerSpots == 2 && (
-              <div className={styles.worker_spot}>
-                <WorkerSpotIcon locked={true} />
-              </div>
-            )}
-          </div>
-        )}
-        <div className={styles.card_description}>
-          <CardDescription card={card} />
+        <div className={styles.art_sprite}>
+          <CardArt card={card} />
         </div>
+        <WorkerSpots card={card} workers={workers} ambassador={ambassador} />
+        {card.expansion && (
+          <span className={styles.expansion}>{card.expansion}</span>
+        )}
       </div>
-      <div className={styles.card_bottom_row}>
+      <div className={styles.description}>
+        <CardDescription card={card} />
+      </div>
+      <div className={styles.footer}>
         <div className={styles.rarity_label}>
           {rarityLabel}
           &nbsp;&middot;&nbsp;{romanize(card.numInDeck)}
@@ -254,18 +345,22 @@ const Card: React.FC<{ name: CardName; usedForCritter?: boolean }> = ({
   );
 };
 
-export const EmptyCard = () => {
-  return <div className={styles.card} />;
+export const EmptyCard: React.FC<{ label?: string }> = ({ label }) => {
+  return (
+    <div className={[styles.card, styles.empty].join(" ")}>
+      {label && <span className={styles.empty_label}>{label}</span>}
+    </div>
+  );
 };
 
 export default Card;
 
-const CardPoints: React.FC<{
-  cardName: CardName;
-  cardIdx: number;
-  cardOwner: Player;
-  gameState: GameState;
-}> = ({ cardName, cardIdx, cardOwner, gameState }) => {
+const getCardPoints = (
+  cardName: CardName,
+  cardIdx: number,
+  cardOwner: Player,
+  gameState: GameState
+): number => {
   const card = CardModel.fromName(cardName);
 
   // Bonus for the WIFE needs to be computed separately because it
@@ -277,9 +372,7 @@ const CardPoints: React.FC<{
   ) {
     extraPoints += 3;
   }
-  return (
-    <div>Points: {card.getPoints(cardOwner, gameState) + extraPoints}</div>
-  );
+  return card.getPoints(cardOwner, gameState) + extraPoints;
 };
 
 export const PlayedCard: React.FC<{
@@ -289,6 +382,7 @@ export const PlayedCard: React.FC<{
   viewerId: string | null;
   cardIdx?: number;
 }> = ({ playedCard, cardOwner, gameState, viewerId, cardIdx }) => {
+  const { getPlayerTheme } = useGameUI();
   const {
     cardOwnerId,
     cardName,
@@ -300,46 +394,57 @@ export const PlayedCard: React.FC<{
     shareSpaceWith = null,
   } = playedCard;
   const card = CardModel.fromName(cardName);
+  const isViewerCard = viewerId === cardOwnerId;
   return (
     <div className={styles.played_card_wrapper}>
       <div className={styles.played_card_card}>
         <Card
           name={cardName}
           usedForCritter={card.isConstruction && usedForCritter}
+          workers={workers}
+          ambassador={ambassador}
         />
       </div>
       <div className={styles.played_card_meta}>
-        <div>
-          Card Owner: {viewerId === cardOwnerId ? "You" : cardOwner.name}
-        </div>
-        {cardIdx && card.cardType === CardType.PROSPERITY && (
-          <CardPoints
-            cardName={cardName}
-            cardIdx={cardIdx}
-            cardOwner={cardOwner}
-            gameState={gameState}
-          />
+        <span className="sr-only">
+          Card Owner: {isViewerCard ? "You" : cardOwner.name}
+        </span>
+        {!isViewerCard && (
+          <span
+            className={styles.owner_chip}
+            style={playerThemeStyle(getPlayerTheme(cardOwnerId))}
+          >
+            {cardOwner.name}
+          </span>
         )}
+        {cardIdx && card.cardType === CardType.PROSPERITY ? (
+          <span className={styles.meta_chip}>
+            Points:{" "}
+            <b>{getCardPoints(cardName, cardIdx, cardOwner, gameState)}</b>
+          </span>
+        ) : null}
         {"workers" in playedCard && (
-          <div>Workers on card: {workers.length}</div>
+          <span className="sr-only">Workers on card: {workers.length}</span>
         )}
         {"ambassador" in playedCard && (
-          <div>Ambassadors on card: {ambassador ? "1" : "0"}</div>
+          <span className="sr-only">
+            Ambassadors on card: {ambassador ? "1" : "0"}
+          </span>
         )}
         {"shareSpaceWith" in playedCard && shareSpaceWith && (
-          <div>Share space: {shareSpaceWith}</div>
+          <span className={styles.meta_chip}>Share space: {shareSpaceWith}</span>
         )}
         {"pairedCards" in playedCard && (
-          <div>
-            Beneath Card:{" "}
+          <span className={styles.meta_chip}>
+            Beneath:{" "}
             <Description textParts={toGameText(`${pairedCards.length} CARD`)} />
-          </div>
+          </span>
         )}
-        {"resources" in playedCard && (
-          <div>
-            On Card:{" "}
+        {"resources" in playedCard && sumResources(resources) > 0 && (
+          <span className={styles.meta_chip}>
+            On card:{" "}
             <Description textParts={resourceMapToGameText(resources)} />
-          </div>
+          </span>
         )}
       </div>
     </div>

@@ -1,0 +1,79 @@
+.particles {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+@keyframes fall {
+  0% {
+    transform: translate3d(0, -6vh, 0) rotate(0deg);
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.9;
+  }
+  90% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate3d(var(--drift, 40px), 106vh, 0) rotate(420deg);
+    opacity: 0;
+  }
+}
+
+.particle {
+  position: absolute;
+  top: 0;
+  animation-name: fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+
+@keyframes glow {
+  0%,
+  100% {
+    transform: translate(0, 0);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.95;
+  }
+  50% {
+    transform: translate(var(--drift, 30px), -36px);
+    opacity: 0.4;
+  }
+  70% {
+    opacity: 0.95;
+  }
+}
+
+.firefly {
+  position: absolute;
+  animation-name: glow;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  filter: drop-shadow(0 0 4px #fff59a);
+}
+
+.scenery {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.scenery_item {
+  position: absolute;
+  display: block;
+  line-height: 0;
+  filter: drop-shadow(0 6px 0 rgba(0, 0, 0, 0.15));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .particles {
+    display: none;
+  }
+}

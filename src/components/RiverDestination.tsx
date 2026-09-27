@@ -1,6 +1,7 @@
 import * as React from "react";
 
 import styles from "../styles/RiverDestination.module.css";
+import anim from "../styles/animations.module.css";
 
 import {
   RiverDestination as RiverDestinationModel,
@@ -13,6 +14,8 @@ import {
 } from "../model/types";
 
 import { Description, ItemWrapper } from "./common";
+import { Meeple } from "./pixel/icons";
+import { useGameUI } from "./gameUI";
 
 const RiverDestinationInner = ({ name }: { name: RiverDestinationName }) => {
   const riverDestination = RiverDestinationModel.fromName(name);
@@ -61,11 +64,14 @@ export const RiverDestinationSpot = ({
   name,
   destination = null,
   ambassadors = null,
+  ambassadorIds = null,
 }: {
   name: RiverDestinationSpotName;
   destination?: RiverDestinationName | null;
   ambassadors?: string[] | null;
+  ambassadorIds?: string[] | null;
 }) => {
+  const { getPlayerTheme } = useGameUI();
   const isShoal = name == RiverDestinationSpotName.SHOAL;
   destination = isShoal ? RiverDestinationName.SHOAL : destination;
   const isUnavailable = !!(ambassadors && !isShoal && ambassadors.length !== 0);
@@ -80,9 +86,24 @@ export const RiverDestinationSpot = ({
             />
             {ambassadors && ambassadors.length !== 0 && (
               <div className={styles.ambassadors}>
-                <span>Ambassadors: </span>
+                <span className="sr-only">Ambassadors: </span>
                 <span className={styles.ambassador}>
-                  {ambassadors.join(", ")}
+                  {ambassadorIds && (
+                    <span className={styles.ambassador_meeples}>
+                      {ambassadorIds.map((playerId, idx) => (
+                        <Meeple
+                          key={idx}
+                          frog
+                          theme={getPlayerTheme(playerId)}
+                          height="22px"
+                          className={anim.popIn}
+                        />
+                      ))}
+                    </span>
+                  )}
+                  <span className={ambassadorIds ? "sr-only" : undefined}>
+                    {ambassadors.join(", ")}
+                  </span>
                 </span>
               </div>
             )}

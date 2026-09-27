@@ -16,6 +16,49 @@ import CardPayment from "./CardPayment";
 import Card from "./Card";
 import { ItemWrapper, CardWithSourceFooter } from "./common";
 
+type PlayCardClientOptions = TGameInputPlayCard["clientOptions"] & {
+  _idx?: number;
+};
+
+// Builds the play-card client options with a sensible default payment:
+// use the associated construction if possible, otherwise pay the base cost.
+export const getPlayCardClientOptions = (
+  cardName: CardName,
+  state: "DEFAULT" | "COST" | "ZERO",
+  overrides: Pick<TGameInputPlayCard["clientOptions"], "source" | "sourceIdx"> & {
+    _idx?: number;
+  },
+  viewingPlayer: Player,
+  base: Partial<PlayCardClientOptions> = {}
+): PlayCardClientOptions => {
+  const card = CardModel.fromName(cardName);
+  const canUseAssociatedCard =
+    card.isCritter &&
+    card.associatedCard.type === "CARD" &&
+    viewingPlayer.hasUnoccupiedConstruction(card.associatedCard.cardName);
+  const isReserved = overrides.source === "RESERVED";
+  return {
+    ...base,
+    ...overrides,
+    card: cardName,
+    paymentOptions: {
+      cardToUse: null,
+      cardToDungeon: undefined,
+      useAssociatedCard: state === "DEFAULT" ? canUseAssociatedCard : false,
+      resources: {
+        [ResourceType.BERRY]: 0,
+        [ResourceType.TWIG]: 0,
+        [ResourceType.RESIN]: 0,
+        [ResourceType.PEBBLE]: 0,
+        ...((state === "DEFAULT" && !canUseAssociatedCard && !isReserved) ||
+        state === "COST"
+          ? card.baseCost
+          : {}),
+      },
+    },
+  };
+};
+
 const GameInputPlayCard: React.FC<{
   options: CardWithSource[];
   viewingPlayer: Player;
@@ -31,32 +74,15 @@ const GameInputPlayCard: React.FC<{
       _idx?: number;
     }
   ) => {
-    const card = CardModel.fromName(cardName);
-    const canUseAssociatedCard =
-      card.isCritter &&
-      card.associatedCard.type === "CARD" &&
-      viewingPlayer.hasUnoccupiedConstruction(card.associatedCard.cardName);
-    const isReserved = overrides.source === "RESERVED";
-    helpers.setValue({
-      ...meta.value,
-      ...overrides,
-      card: cardName,
-      paymentOptions: {
-        cardToUse: null,
-        cardToDungeon: null,
-        useAssociatedCard: state === "DEFAULT" ? canUseAssociatedCard : false,
-        resources: {
-          [ResourceType.BERRY]: 0,
-          [ResourceType.TWIG]: 0,
-          [ResourceType.RESIN]: 0,
-          [ResourceType.PEBBLE]: 0,
-          ...((state === "DEFAULT" && !canUseAssociatedCard && !isReserved) ||
-          state === "COST"
-            ? card.baseCost
-            : {}),
-        },
-      },
-    });
+    helpers.setValue(
+      getPlayCardClientOptions(
+        cardName,
+        state,
+        overrides,
+        viewingPlayer,
+        meta.value
+      )
+    );
   };
   return (
     <div role="group">
@@ -85,7 +111,7 @@ const GameInputPlayCard: React.FC<{
                 }}
               >
                 <ItemWrapper
-                  isHighlighted={isSelected}
+                  isSelected={isSelected}
                   footerChildren={
                     <CardWithSourceFooter cardWithSource={cardWithSource} />
                   }

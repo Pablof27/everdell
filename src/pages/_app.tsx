@@ -32,7 +32,7 @@ export default function App<T extends JSX.IntrinsicAttributes>({
         <link rel="preconnect" href="https://fonts.xz.style" />
         <link rel="stylesheet" href="https://fonts.xz.style/serve/inter.css" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Allura&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Allura&family=Silkscreen:wght@400;700&family=Tiny5&display=swap"
           rel="stylesheet"
         />
         <link rel="shortcut icon" href="/images/favicon.png" />

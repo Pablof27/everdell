@@ -1,40 +1,48 @@
 .adornment {
-  min-height: 180px;
-  width: 160px;
-  border-radius: 5px;
   position: relative;
-  border: 1px solid var(--adornment-border-col);
-  background-color: var(--bg-color-item);
-  overflow: hidden;
   display: flex;
-  align-self: flex-start;
   flex-direction: column;
   justify-content: space-between;
+  align-self: flex-start;
+  width: var(--adornment-width, 150px);
+  min-height: 170px;
+  overflow: hidden;
+  color: #2a1a0e;
+  background: #fdf0f3;
+  box-shadow: inset 0 0 0 3px #e78aa3, 0 -2px 0 0 #2a1a0e, 0 2px 0 0 #2a1a0e,
+    -2px 0 0 0 #2a1a0e, 2px 0 0 0 #2a1a0e, 0 6px 0 0 rgba(0, 0, 0, 0.18);
 }
 
 .adornment_header {
-  font-weight: var(--font-bold);
-  background-color: var(--adornment-col);
-  font-size: 12px;
-  padding: 8px;
-  text-align: center;
-  text-transform: uppercase;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  padding: 6px 8px;
+  font-family: var(--font-pixel);
+  font-size: 13px;
+  line-height: 1.1;
+  text-align: center;
+  text-transform: uppercase;
+  color: #fff8e7;
+  background: #c75b7a;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
 }
 
 .adornment_cost_row {
+  padding: 5px 8px 6px;
   font-size: 12px;
-  padding: 5px;
-  padding-bottom: 10px;
+  background: repeating-linear-gradient(
+    90deg,
+    #f9d5de 0 8px,
+    #f5c6d2 8px 16px
+  );
 }
 
 .adornment_description {
-  text-align: center;
-  padding: 10px 5px 5px 5px;
+  padding: 8px 8px 10px;
   font-size: 12px;
-  line-height: 1.5em;
+  line-height: 1.45;
+  text-align: center;
 }
 
 .base_vp {

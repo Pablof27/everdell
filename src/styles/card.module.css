@@ -1,194 +1,329 @@
+/* All card dimensions are in em so a card scales from a single font-size
+   (set --card-font on any ancestor). */
 .card {
-  min-height: 180px;
-  width: 200px;
-  border-radius: 5px;
+  --tc: var(--type-production);
+  --tcd: var(--type-production-dark);
+  --scene: #d6f0fa;
   position: relative;
-  border: 1px solid var(--border-color);
-  background-color: var(--bg-color-item);
-  overflow: hidden;
   display: flex;
-  align-self: flex-start;
   flex-direction: column;
-  justify-content: space-between;
+  align-self: flex-start;
+  width: var(--card-width, 15em);
+  min-height: var(--card-min-height, 18.5em);
+  padding: 0.3em;
+  font-size: var(--card-font, 10px);
+  font-family: var(--font-sans);
+  line-height: 1.25;
+  text-align: left;
+  color: #2a1a0e;
+  background: #fbf2dc;
+  box-shadow: inset 0 0 0 0.3em var(--tc), 0 -0.2em 0 0 #2a1a0e,
+    0 0.2em 0 0 #2a1a0e, -0.2em 0 0 0 #2a1a0e, 0.2em 0 0 0 #2a1a0e,
+    0 0.55em 0 0 rgba(0, 0, 0, 0.18);
 }
 
-.card_header {
-  height: 35px;
-  font-weight: var(--font-bold);
-  font-size: 12px;
+.type_production {
+  --tc: var(--type-production);
+  --tcd: var(--type-production-dark);
+  --scene: linear-gradient(
+    180deg,
+    #d6f0fa 0 58%,
+    #9bd660 58% 74%,
+    #76b646 74% 100%
+  );
+}
+
+.type_destination {
+  --tc: var(--type-destination);
+  --tcd: var(--type-destination-dark);
+  --scene: linear-gradient(
+    180deg,
+    #fde2c0 0 58%,
+    #e6b27a 58% 74%,
+    #c98f58 74% 100%
+  );
+}
+
+.type_governance {
+  --tc: var(--type-governance);
+  --tcd: var(--type-governance-dark);
+  --scene: linear-gradient(
+    180deg,
+    #dcebf7 0 58%,
+    #c3ccd4 58% 74%,
+    #a3adb6 74% 100%
+  );
+}
+
+.type_prosperity {
+  --tc: var(--type-prosperity);
+  --tcd: var(--type-prosperity-dark);
+  --scene: radial-gradient(#fff 0.08em, transparent 0.1em) 0 0 / 2.3em 1.7em,
+    linear-gradient(180deg, #d9ccf2 0 58%, #b9a6e3 58% 74%, #9580c7 74% 100%);
+}
+
+.type_traveler {
+  --tc: var(--type-traveler);
+  --tcd: var(--type-traveler-dark);
+  --scene: linear-gradient(
+    180deg,
+    #f7ead0 0 58%,
+    #e0c290 58% 74%,
+    #c9a26a 74% 100%
+  );
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.25em;
+  min-height: 2.3em;
+  padding: 0 0.1em 0.2em;
+  color: #fff8e7;
+  background: var(--tc);
+}
+
+.type_badge {
+  flex: none;
+  width: 1.8em;
+  height: 1.8em;
+}
+
+.name {
+  flex: 1;
+  min-width: 0;
   text-align: center;
-  color: var(--text-color-inv);
+  font-family: var(--font-pixel);
+  font-weight: 700;
+  font-size: 1.12em;
+  line-height: 1;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
+  text-shadow: 0 0.12em 0 rgba(0, 0, 0, 0.35);
+  overflow-wrap: anywhere;
+}
+
+.vp {
+  flex: none;
+  font-size: 1.1em;
+}
+
+.art {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  min-height: 5.4em;
+  padding: 0.3em;
+  overflow: hidden;
+  background: var(--scene);
+  box-shadow: inset 0 -0.2em 0 0 rgba(0, 0, 0, 0.16);
+}
+
+.art_sprite {
+  position: absolute;
+  left: 50%;
+  bottom: 0.2em;
+  height: 4.5em;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: flex-end;
+  pointer-events: none;
+}
+
+.cost {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
+  gap: 0.3em;
+}
+
+.cost_item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1em;
+  padding: 0.05em 0.3em 0.05em 0.05em;
+  background: rgba(255, 248, 231, 0.94);
+  box-shadow: 0 -0.12em 0 0 #2a1a0e, 0 0.12em 0 0 #2a1a0e,
+    -0.12em 0 0 0 #2a1a0e, 0.12em 0 0 0 #2a1a0e;
+}
+
+.cost_icon {
+  width: 1.35em;
+  height: 1.35em;
+}
+
+.cost_value {
+  min-width: 0.7em;
+  font-family: var(--font-pixel);
+  font-weight: 700;
+  font-size: 1.1em;
+  line-height: 1;
+  text-align: center;
+}
+
+.spots {
+  position: absolute;
+  right: 0.3em;
+  bottom: 0.3em;
+  z-index: 1;
+  display: flex;
+  gap: 0.25em;
+}
+
+.spot {
+  width: 1.9em;
+  height: 1.9em;
+  padding: 0.12em;
+  display: inline-flex;
+  align-items: flex-end;
   justify-content: center;
+  background: rgba(255, 248, 231, 0.85);
+  box-shadow: 0 -0.12em 0 0 #2a1a0e, 0 0.12em 0 0 #2a1a0e,
+    -0.12em 0 0 0 #2a1a0e, 0.12em 0 0 0 #2a1a0e;
 }
 
 .expansion {
-  font-size: 8px;
-  font-weight: normal;
+  position: absolute;
+  top: 0.3em;
+  right: 0.3em;
+  padding: 0.15em 0.35em;
+  font-family: var(--font-pixel);
+  font-size: 0.62em;
+  letter-spacing: 0.08em;
+  color: #fff8e7;
+  background: rgba(42, 26, 14, 0.72);
 }
 
-.card_bottom_row {
+.description {
+  flex: 1;
   display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5em 0.35em 0.4em;
+  font-size: 1em;
+  line-height: 1.32;
+  text-align: center;
+}
+
+.footer {
+  display: flex;
+  align-items: flex-end;
   justify-content: space-between;
+  gap: 0.3em;
+  min-height: 1.5em;
+}
+
+.rarity_label {
+  padding: 0 0 0.3em 0.2em;
+  font-size: 0.66em;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #a08868;
 }
 
 .associated_card {
   display: flex;
-  color: var(--text-color);
-  text-transform: uppercase;
+  flex: none;
+  max-width: 60%;
   text-align: right;
+  text-transform: uppercase;
+}
+
+.associated_card > span {
+  display: block;
+  font-weight: 800;
+  font-size: 0.74em;
+  line-height: 1.15;
+}
+
+.associated_card_construction {
+  margin: 0 -0.3em -0.3em 0;
+}
+
+.associated_card_construction > span {
+  padding: 0.45em 0.55em 0.4em;
+  color: #fff8e7;
+  background: var(--tc);
+  text-shadow: 0 0.1em 0 rgba(0, 0, 0, 0.3);
+}
+
+.associated_card_critter > span {
+  padding: 0 0.2em 0.35em;
+  color: #a08868;
 }
 
 .associated_card_used {
   text-decoration: line-through;
-  opacity: 0.3;
+  opacity: 0.35;
 }
 
 .associated_card_golden_leaf {
-  position: relative;
   white-space: nowrap;
-  margin-right: -5px;
 }
 
-.color_associated_card_gold {
-  background: var(--color-gold-leaf);
-  color: var(--color-vp-text) !important;
+.associated_card_golden_leaf > span {
+  color: #3c1346 !important;
+  background: #f0cba8 !important;
+  text-shadow: none !important;
 }
 
-.associated_card > span {
-  border-radius: 5px 0 0 0;
-  font-weight: var(--font-bold);
-  color: var(--text-color-inv);
-  padding: 6px 5px 4px 5px;
-  font-size: 10px;
-  align-self: flex-end;
+.empty {
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 248, 231, 0.3);
+  box-shadow: inset 0 0 0 0.2em rgba(42, 26, 14, 0.25);
+  outline: 0.2em dashed rgba(42, 26, 14, 0.4);
+  outline-offset: -0.6em;
 }
 
-.info_row {
-  display: flex;
-  flex-direction: column;
-  flex: auto;
-  justify-content: space-between;
-}
-
-.card_cost {
-  display: flex;
-  flex: auto;
-  min-height: 8px;
-}
-
-.card_cost_item {
-  padding: 5px;
-  max-height: 30px;
-}
-
-.card_description {
-  padding: 10px 5px 5px 5px;
-  font-size: 12px;
-  line-height: 1.5em;
-  text-align: center;
-}
-
-.card_cost_value {
-  font-size: 14px;
-}
-
-.rarity_label {
-  padding: 6px 5px 4px 5px;
+.empty_label {
+  font-family: var(--font-pixel);
+  font-weight: 700;
+  font-size: 1.2em;
   text-transform: uppercase;
-  font-size: 10px;
-  font-weight: var(--font-bold);
-  color: var(--text-color-light);
-}
-
-.circle {
-  border-radius: 99px;
-  width: 24px;
-  height: 24px;
-  margin: 6px;
-
-  text-align: center;
-  font-size: 27px;
-}
-
-.card_header_vp {
-  position: absolute;
-  top: 0;
-  right: 0;
-  z-index: 10;
-}
-
-.card_header_vp_number {
-  font-size: 15px;
-  font-weight: var(--font-bold);
-  display: inline-block;
-  margin-top: -14px;
-  vertical-align: middle;
-  color: var(--color-vp-text);
-}
-
-.card_header_symbol {
-  position: absolute;
-  top: 0;
-  z-index: 10;
-}
-
-.color_victory_point {
-  background: var(--color-vp);
-}
-
-.color_destination {
-  background: var(--color-dest);
-}
-
-.color_production {
-  background: var(--color-prod);
-}
-
-.color_prosperity {
-  background: var(--color-pros);
-}
-
-.color_traveler {
-  background: var(--color-trav);
-}
-
-.color_governance {
-  background: var(--color-gov);
-}
-
-.color_associated_card_critter {
-  color: var(--text-color-light) !important;
+  color: rgba(42, 26, 14, 0.6);
 }
 
 .played_card_wrapper {
   display: flex;
-  align-self: flex-start;
   flex-direction: column;
-  align-content: center;
-  justify-content: center;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
 }
 
 .played_card_card > div {
   margin: auto;
 }
 
-.played_card_meta > div {
-  margin: 5px 0;
-  font-size: 10px;
-}
-
-.worker_spot_row {
-  margin: auto;
+.played_card_meta {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  max-width: 100%;
 }
 
-.worker_spot {
-  position: relative;
+.meta_chip,
+.owner_chip {
   display: inline-block;
-  margin: 0 8px;
-  width: 40px;
-  height: 25px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  box-shadow: 0 -2px 0 0 #2a1a0e, 0 2px 0 0 #2a1a0e, -2px 0 0 0 #2a1a0e,
+    2px 0 0 0 #2a1a0e;
+}
+
+.meta_chip {
+  color: #2a1a0e;
+  background: #fff8e7;
+}
+
+.owner_chip {
+  color: #fff;
+  background: var(--player-color, #9c8468);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
 }

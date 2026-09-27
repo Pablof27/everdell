@@ -48,7 +48,7 @@ const GameInputSelectWorkerPlacement: React.FC<{
                 }
               }}
             >
-              <ItemWrapper isHighlighted={isSelected}>
+              <ItemWrapper isSelected={isSelected}>
                 {workerOption.event ? (
                   <Event name={workerOption.event} />
                 ) : workerOption.location ? (
