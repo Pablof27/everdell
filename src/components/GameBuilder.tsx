@@ -19,6 +19,7 @@ const GameBuilder: React.FC = () => {
         initialValues={{
           players: [getDummyPlayer("Player 1"), getDummyPlayer("Player 2")],
           randomizeStartingPlayer: true,
+          chooseStartingResources: true,
           realtimePoints: true,
           pearlbrook: false,
         }}
@@ -131,6 +132,13 @@ const GameBuilder: React.FC = () => {
                               name="randomizeStartingPlayer"
                             />
                             {"Randomize player order"}
+                          </label>
+                          <label className={styles.game_builder_option}>
+                            <Field
+                              type="checkbox"
+                              name="chooseStartingResources"
+                            />
+                            {"Choose 3 starting resources"}
                           </label>
                           <label className={styles.game_builder_option}>
                             <Field type="checkbox" name="realtimePoints" />

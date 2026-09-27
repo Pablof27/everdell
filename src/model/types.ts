@@ -314,6 +314,7 @@ export type GameInputMultiStepContext = {
   trainCarTileContext?: TrainCarTileName;
   trainTicketContext?: boolean;
   reservationTokenContext?: boolean;
+  startingResourcesContext?: boolean;
 };
 
 export type GameInputMultiStep = (
@@ -804,6 +805,7 @@ export interface IGameTextEntity {
 export type GameOptions = {
   realtimePoints: boolean;
   allowUndo?: boolean;
+  chooseStartingResources?: boolean;
   pearlbrook: boolean;
 
   // NOT IMPLEMENTED YET

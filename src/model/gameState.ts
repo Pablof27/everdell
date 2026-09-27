@@ -1,6 +1,7 @@
 import {
   AdornmentName,
   AmbassadorPlacementInfo,
+  CardCost,
   CardName,
   CardType,
   CardWithSource,
@@ -59,6 +60,7 @@ import { assertUnreachable } from "../utils";
 import {
   toGameText,
   cardListToGameText,
+  resourceMapToGameText,
   workerPlacementToGameText,
 } from "./gameText";
 import { sumResources } from "./gameStatePlayHelpers";
@@ -71,9 +73,29 @@ import { VisitorStack, intialVisitorStack } from "./visitor";
 const MEADOW_SIZE = 8;
 const STATION_SIZE = 3;
 const STARTING_PLAYER_HAND_SIZE = 5;
+const NUM_STARTING_RESOURCES = 3;
+const STARTING_RESOURCE_OPTIONS = [
+  ResourceType.TWIG,
+  ResourceType.RESIN,
+  ResourceType.PEBBLE,
+  ResourceType.BERRY,
+];
 const MAX_GAME_LOG_BUFFER = 100;
 
 const PRINT_GAME_LOGS = false;
+
+const startingResourcesGameInput = (): GameInputMultiStep => ({
+  inputType: GameInputType.SELECT_RESOURCES,
+  prevInputType: GameInputType.SELECT_RESOURCES,
+  label: `Choose ${NUM_STARTING_RESOURCES} ANY to start the game with`,
+  startingResourcesContext: true,
+  toSpend: false,
+  minResources: NUM_STARTING_RESOURCES,
+  maxResources: NUM_STARTING_RESOURCES,
+  clientOptions: {
+    resources: {},
+  },
+});
 
 export const gameTextToDebugStr = (gameText: GameText): string => {
   return gameText
@@ -968,6 +990,11 @@ export class GameState {
       return;
     }
 
+    if (gameInput.startingResourcesContext) {
+      this.handleStartingResourcesGameInput(gameInput);
+      return;
+    }
+
     if (
       gameInput.prevInputType === GameInputType.PREPARE_FOR_SEASON &&
       gameInput.inputType === GameInputType.SELECT_CARDS
@@ -997,6 +1024,50 @@ export class GameState {
     }
 
     throw new Error(`Unhandled game input: ${JSON.stringify(gameInput)}`);
+  }
+
+  private handleStartingResourcesGameInput(
+    gameInput: GameInputMultiStep
+  ): void {
+    if (gameInput.inputType !== GameInputType.SELECT_RESOURCES) {
+      throw new Error(`Unexpected game input ${JSON.stringify(gameInput)}`);
+    }
+    const resources: CardCost = {};
+    Object.entries(gameInput.clientOptions.resources).forEach(
+      ([resourceType, value]) => {
+        if (!STARTING_RESOURCE_OPTIONS.includes(resourceType as ResourceType)) {
+          throw new Error(
+            "Starting resources must be TWIG, RESIN, PEBBLE or BERRY."
+          );
+        }
+        // Form inputs may send numbers as strings.
+        const count = Number(value);
+        if (!Number.isInteger(count) || count < 0) {
+          throw new Error("Please enter a whole number of 0 or more.");
+        }
+        if (count > 0) {
+          resources[resourceType as keyof CardCost] = count;
+        }
+      }
+    );
+
+    const player = this.getActivePlayer();
+    player.gainResources(this, resources);
+    this.addGameLog([
+      player,
+      " chose ",
+      ...resourceMapToGameText(resources),
+      " as their starting resources.",
+    ]);
+
+    // Once the last player has chosen, the normal turn change starts the game.
+    const nextPlayer = this.players[this.players.indexOf(player) + 1];
+    if (nextPlayer) {
+      this._activePlayerId = nextPlayer.playerId;
+      this.gameStateForUndo = null;
+      this.playedGameInputs = [];
+      this.pendingGameInputs.push(startingResourcesGameInput());
+    }
   }
 
   private handleClaimEventGameInput(gameInput: GameInputClaimEvent): void {
@@ -1788,6 +1859,13 @@ export class GameState {
 
     if (withPearlbrook) {
       gameState.addGameLog(`Dealing 2 adornment cards to each player.`);
+    }
+
+    if (gameOptionsWithDefaults.chooseStartingResources) {
+      gameState.addGameLog(
+        `Each player chooses ${NUM_STARTING_RESOURCES} starting resources.`
+      );
+      gameState.pendingGameInputs.push(startingResourcesGameInput());
     }
 
     return gameState;

@@ -33,6 +33,7 @@ export default async (
     : [...body.players];
   const realtimePoints = !!body.realtimePoints;
   const allowUndo = !!body.allowUndo;
+  const chooseStartingResources = !!body.chooseStartingResources;
   const pearlbrook = !!body.pearlbrook;
   const newleaf = body.newleaf
     ? {
@@ -54,6 +55,7 @@ export default async (
     players.map((p: any) => p.name),
     {
       allowUndo,
+      chooseStartingResources,
       realtimePoints,
       pearlbrook,
       newleaf,

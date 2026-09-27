@@ -57,19 +57,23 @@ const ViewerUI: React.FC<{
                 zIndex: idx + 1,
               }}
             >
-              <BoardCard
-                cardName={cardName}
-                cardWithSource={{ card: cardName, source: "HAND" }}
-                interactive={isActive}
-                zoomable={false}
-                badgeOnTop={true}
-                delay={idx * 40}
-              />
+              <div className={styles.hand_card}>
+                <BoardCard
+                  cardName={cardName}
+                  cardWithSource={{ card: cardName, source: "HAND" }}
+                  interactive={isActive}
+                  zoomable={false}
+                  badgeOnTop={true}
+                  delay={idx * 40}
+                />
+              </div>
             </div>
           ))}
           {player.getAdornmentsInHand().map((name, idx) => (
             <div key={`adornment-${idx}`} className={styles.hand_adornment}>
-              <Adornment name={name} />
+              <div className={styles.hand_card}>
+                <Adornment name={name} />
+              </div>
             </div>
           ))}
         </div>
@@ -78,13 +82,15 @@ const ViewerUI: React.FC<{
         <div className={styles.reserved_area}>
           <div className={styles.dock_label}>Reserved</div>
           <div className={styles.hand_slot}>
-            <BoardCard
-              cardName={reservedCard}
-              cardWithSource={{ card: reservedCard, source: "RESERVED" }}
-              interactive={isActive}
-              zoomable={false}
-              badgeOnTop={true}
-            />
+            <div className={styles.hand_card}>
+              <BoardCard
+                cardName={reservedCard}
+                cardWithSource={{ card: reservedCard, source: "RESERVED" }}
+                interactive={isActive}
+                zoomable={false}
+                badgeOnTop={true}
+              />
+            </div>
           </div>
         </div>
       )}

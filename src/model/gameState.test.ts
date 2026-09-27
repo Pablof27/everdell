@@ -2,9 +2,11 @@ import expect from "expect.js";
 import { GameState } from "./gameState";
 import {
   AdornmentName,
+  CardCost,
   CardName,
   EventName,
   GameInput,
+  GameInputSelectResources,
   GameInputType,
   LocationName,
   LocationType,
@@ -2142,6 +2144,124 @@ describe("GameState", () => {
         CardName.HISTORIAN,
         CardName.INN,
       ]);
+    });
+  });
+
+  describe("chooseStartingResources", () => {
+    const chooseStartingResources = (
+      gameState: GameState,
+      resources: CardCost
+    ): GameState => {
+      const [gameInput] = gameState.pendingGameInputs;
+      expect(gameInput.inputType).to.be(GameInputType.SELECT_RESOURCES);
+      return gameState.next({
+        ...(gameInput as GameInputSelectResources),
+        clientOptions: { resources },
+      });
+    };
+
+    beforeEach(() => {
+      gameState = testInitialGameState({
+        numPlayers: 3,
+        gameOptions: { chooseStartingResources: true },
+      });
+    });
+
+    it("should not ask for starting resources by default", () => {
+      gameState = testInitialGameState();
+      expect(gameState.pendingGameInputs).to.eql([]);
+    });
+
+    it("should let each player choose before the first turn", () => {
+      const [player1, player2, player3] = gameState.players;
+      expect(gameState.activePlayerId).to.be(player1.playerId);
+      expect(gameState.getPossibleGameInputs()).to.eql(
+        gameState.pendingGameInputs
+      );
+
+      gameState = chooseStartingResources(gameState, {
+        [ResourceType.TWIG]: 3,
+      });
+      expect(gameState.activePlayerId).to.be(player2.playerId);
+
+      gameState = chooseStartingResources(gameState, {
+        [ResourceType.BERRY]: 1,
+        [ResourceType.RESIN]: 2,
+      });
+      expect(gameState.activePlayerId).to.be(player3.playerId);
+
+      gameState = chooseStartingResources(gameState, {
+        [ResourceType.PEBBLE]: 1,
+        [ResourceType.TWIG]: 1,
+        [ResourceType.BERRY]: 1,
+      });
+
+      // The game then starts as normal with the first player.
+      expect(gameState.activePlayerId).to.be(player1.playerId);
+      expect(gameState.pendingGameInputs).to.eql([]);
+      expect(
+        gameState.getPossibleGameInputs().map((x) => x.inputType)
+      ).to.contain(GameInputType.PLACE_WORKER);
+
+      expect(
+        gameState.getPlayer(player1.playerId).getCardCostResources()
+      ).to.eql({ TWIG: 3, RESIN: 0, PEBBLE: 0, BERRY: 0 });
+      expect(
+        gameState.getPlayer(player2.playerId).getCardCostResources()
+      ).to.eql({ TWIG: 0, RESIN: 2, PEBBLE: 0, BERRY: 1 });
+      expect(
+        gameState.getPlayer(player3.playerId).getCardCostResources()
+      ).to.eql({ TWIG: 1, RESIN: 0, PEBBLE: 1, BERRY: 1 });
+    });
+
+    it("should accept resource counts sent as strings", () => {
+      const player1 = gameState.players[0];
+      gameState = chooseStartingResources(gameState, {
+        [ResourceType.TWIG]: "2",
+        [ResourceType.BERRY]: "1",
+        [ResourceType.RESIN]: "",
+      } as any);
+      expect(
+        gameState.getPlayer(player1.playerId).getCardCostResources()
+      ).to.eql({ TWIG: 2, RESIN: 0, PEBBLE: 0, BERRY: 1 });
+    });
+
+    it("should reject invalid choices", () => {
+      expect(() => {
+        chooseStartingResources(gameState, { [ResourceType.TWIG]: 2 });
+      }).to.throwException(/Must select exactly 3 resources/i);
+      expect(() => {
+        chooseStartingResources(gameState, {
+          [ResourceType.TWIG]: 4,
+          [ResourceType.BERRY]: -1,
+        });
+      }).to.throwException(/whole number/i);
+      expect(() => {
+        chooseStartingResources(gameState, {
+          [ResourceType.TWIG]: 1.5,
+          [ResourceType.BERRY]: 1.5,
+        });
+      }).to.throwException(/whole number/i);
+      [ResourceType.PEARL, ResourceType.VP].forEach((resourceType) => {
+        expect(() => {
+          chooseStartingResources(gameState, { [resourceType]: 3 } as any);
+        }).to.throwException(/must be TWIG, RESIN, PEBBLE or BERRY/i);
+      });
+    });
+
+    it("should not let the next player undo the previous choice", () => {
+      gameState = testInitialGameState({
+        gameOptions: { chooseStartingResources: true, allowUndo: true },
+      });
+      gameState = chooseStartingResources(gameState, {
+        [ResourceType.TWIG]: 3,
+      });
+      expect(gameState.getPossibleGameInputs().map((x) => x.inputType)).to.eql([
+        GameInputType.SELECT_RESOURCES,
+      ]);
+      expect(() => {
+        gameState.next({ inputType: GameInputType.UNDO });
+      }).to.throwException(/Unable to undo/i);
     });
   });
 
