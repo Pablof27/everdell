@@ -108,6 +108,18 @@
   font-size: 18px;
 }
 
+.game_builder_player_bot {
+  display: flex;
+  align-items: center;
+  padding-left: 10px;
+  font-size: 16px;
+}
+
+.game_builder_player_bot input {
+  width: auto;
+  margin-right: 5px;
+}
+
 .game_builder_option {
   padding: 5px;
   display: flex;

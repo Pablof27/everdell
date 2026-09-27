@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getGameById } from "../../model/game";
+import { playBotTurns } from "../../bot/botRunner";
 
 export default async (
   req: NextApiRequest,
@@ -65,6 +66,13 @@ export default async (
       error: e.toString?.().split("\n")[0],
     });
     return;
+  }
+  // The human's move is saved; bot turns (if any) are played before
+  // responding so the client's refresh already shows them.
+  try {
+    await playBotTurns(game);
+  } catch (e) {
+    console.error(`Bot failed in game ${game.gameId}`, e);
   }
   res.json({ success: "ok" });
 };

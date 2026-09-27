@@ -1,5 +1,6 @@
 import {
   AdornmentName,
+  BotType,
   CardName,
   EventName,
   EventNameToPlayerId,
@@ -74,6 +75,7 @@ export type PlayerJSON = {
   reservedCard: CardName | "UNUSED" | "USED";
   numGoldenLeaf: number;
   claimedVisitors: VisitorName[];
+  botType?: BotType | null;
 };
 
 export type RiverDestinationMapJSON = {

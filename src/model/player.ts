@@ -3,6 +3,7 @@ import cloneDeep from "lodash/cloneDeep";
 import omit from "lodash/omit";
 import {
   AdornmentName,
+  BotType,
   CardCost,
   CardName,
   CardType,
@@ -81,6 +82,8 @@ export class Player implements IGameTextEntity {
 
   readonly claimedVisitors: VisitorName[];
 
+  readonly botType: BotType | null;
+
   constructor({
     name,
     playerSecret = uuid(),
@@ -109,6 +112,7 @@ export class Player implements IGameTextEntity {
     trainTicketStatus = null,
     reservedCard = "UNUSED",
     claimedVisitors = [],
+    botType = null,
   }: {
     name: string;
     playerSecret?: string;
@@ -130,10 +134,12 @@ export class Player implements IGameTextEntity {
     trainTicketStatus?: TrainTicketStatus | null;
     reservedCard?: CardName | "UNUSED" | "USED";
     claimedVisitors?: VisitorName[];
+    botType?: BotType | null;
   }) {
     this.playerId = playerId;
     this.playerSecret = playerSecret;
     this.name = name;
+    this.botType = botType;
     this.playedCards = playedCards;
     this.cardsInHand = cardsInHand;
     this.resources = resources;
@@ -160,6 +166,10 @@ export class Player implements IGameTextEntity {
 
   get playerSecretUNSAFE(): string {
     return this.playerSecret;
+  }
+
+  get isBot(): boolean {
+    return !!this.botType;
   }
 
   getGameTextPart(): TextPartPlayer {
@@ -401,6 +411,15 @@ export class Player implements IGameTextEntity {
 
     // Remove playedCard
     playedCards.splice(idx, 1);
+
+    // Effects still waiting on this card (eg. a Storehouse choosing what to
+    // store while a Magician discards it) can no longer resolve.
+    for (let i = gameState.pendingGameInputs.length - 1; i >= 0; i--) {
+      const context = gameState.pendingGameInputs[i].playedCardContext;
+      if (context && isEqual(context, playedCardInfo_)) {
+        gameState.pendingGameInputs.splice(i, 1);
+      }
+    }
 
     // Some cards that contain other cards (eg. dungeon)
     const removedCards: CardName[] = [cardName, ...pairedCards];
@@ -955,43 +974,23 @@ export class Player implements IGameTextEntity {
 
     // Make sure we update all existing playedCardInfo references.
     gameState.updatePendingGameInputs((gameInput) => {
-      switch (gameInput.inputType) {
-        case GameInputType.SELECT_CARDS:
-        case GameInputType.SELECT_LOCATION:
-        case GameInputType.SELECT_PAYMENT_FOR_CARD:
-        case GameInputType.SELECT_RESOURCES:
-        case GameInputType.DISCARD_CARDS:
-        case GameInputType.SELECT_PLAYER:
-        case GameInputType.SELECT_WORKER_PLACEMENT:
-        case GameInputType.SELECT_PLAYED_ADORNMENT:
-        case GameInputType.SELECT_RIVER_DESTINATION:
-        case GameInputType.SELECT_CARDS_WITH_SOURCE:
-        case GameInputType.SELECT_TRAIN_CAR_TILE:
-        case GameInputType.SELECT_VISITOR:
-          return gameInput;
-
-        case GameInputType.SELECT_OPTION_GENERIC:
-          if (
-            gameInput.playedCardContext &&
-            isEqual(gameInput.playedCardContext, origPlayedCardCopy)
-          ) {
-            return {
-              ...gameInput,
-              playedCardContext: newPlayedCard,
-            };
-          }
-          return gameInput;
-        case GameInputType.SELECT_PLAYED_CARDS:
-          return {
-            ...gameInput,
-            cardOptions: gameInput.cardOptions.map((x) =>
-              isEqual(x, origPlayedCardCopy) ? newPlayedCard : x
-            ),
-          };
-
-        default:
-          assertUnreachable(gameInput, JSON.stringify(gameInput, null, 2));
+      // Any pending input may carry the card as context (eg. Messenger,
+      // Freight Car); a stale copy would no longer match the city.
+      if (
+        gameInput.playedCardContext &&
+        isEqual(gameInput.playedCardContext, origPlayedCardCopy)
+      ) {
+        gameInput = { ...gameInput, playedCardContext: newPlayedCard };
       }
+      if (gameInput.inputType === GameInputType.SELECT_PLAYED_CARDS) {
+        return {
+          ...gameInput,
+          cardOptions: gameInput.cardOptions.map((x) =>
+            isEqual(x, origPlayedCardCopy) ? newPlayedCard : x
+          ),
+        };
+      }
+      return gameInput;
     });
 
     if (!found) {
@@ -2100,6 +2099,7 @@ export class Player implements IGameTextEntity {
       trainTicketStatus: this.trainTicketStatus,
       numGoldenLeaf: this.numGoldenLeaf,
       reservedCard: this.reservedCard,
+      botType: this.botType,
       ...(includePrivate
         ? {
             playerSecret: this.playerSecret,
@@ -2125,9 +2125,13 @@ export class Player implements IGameTextEntity {
   }
 }
 
-export const createPlayer = (name: string): Player => {
+export const createPlayer = (
+  name: string,
+  opts: { botType?: BotType | null; playerId?: string } = {}
+): Player => {
   const player = new Player({
     name,
+    ...opts,
   });
   return player;
 };

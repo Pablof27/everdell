@@ -1,4 +1,4 @@
-import shuffle from "lodash/shuffle";
+import { shuffle } from "./random";
 import isEqual from "lodash/isEqual";
 import omit from "lodash/omit";
 import {
