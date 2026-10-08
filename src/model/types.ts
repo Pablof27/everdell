@@ -341,7 +341,7 @@ export type GameInputMultiStep = (
 export type GameInput = GameInputSimple | GameInputMultiStep;
 
 // Players with a botType have their turns played by the server (see src/bot).
-export type BotType = "RANDOM";
+export type BotType = "RANDOM" | "GREEDY";
 
 export enum Season {
   WINTER = "Winter",

@@ -1,6 +1,8 @@
 import { GameState } from "../model/gameState";
 import { GameInput, BotType } from "../model/types";
 import { Rng, random, sample } from "../model/random";
+import { GreedyBot } from "./greedyBot";
+import { Weights, handTunedWeights } from "./evaluations";
 
 export interface Bot {
   readonly name: string;
@@ -28,10 +30,12 @@ export class RandomBot implements Bot {
   }
 }
 
-export function createBot(botType: BotType, opts: { rng?: Rng } = {}): Bot {
+export function createBot(botType: BotType, opts: { rng?: Rng; weights?: Weights } = {}): Bot {
   switch (botType) {
     case "RANDOM":
       return new RandomBot(opts);
+    case "GREEDY":
+      return new GreedyBot({ rng: opts.rng, weights: opts.weights ?? handTunedWeights() });
     default:
       throw new Error(`Unknown bot type: ${botType}`);
   }
