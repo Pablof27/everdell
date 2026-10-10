@@ -35,14 +35,15 @@ export class GreedyBot implements Bot {
         var bestScore = -Infinity
 
         for (const move of legalMoves) {
+            let s = root
             try {
-                let s1 = root.next(cloneDeep(move), true, true)
+                s = root.next(cloneDeep(move), true, true)
             } catch (e) {
                 console.error(e)
                 continue
             }
-
-            let score = evaluate(root, me, this.weights) + this.rng() * 1e-6
+            s = this.resolvePendingGreedily(s, me)
+            let score = evaluate(s, me, this.weights) + this.rng() * 1e-6
             if (bestScore < score) {
                 bestScore = score
                 bestMove = move
@@ -67,9 +68,6 @@ export class GreedyBot implements Bot {
     }
 
     valueFor(s: GameState, me: string): number {
-        if (s.isGameOver()) {
-            return s.getPlayer(me).getPoints(s)
-        }
         return evaluate(s, me, this.weights)
     }
 }
