@@ -1,23 +1,26 @@
 import { GameState } from "../model/gameState"
-import { PlayerStatus } from "../model/types"
+import { PlayerStatus, Season } from "../model/types"
 import { extractFeatures, FEATURE_NAMES } from "./features"
 
-export type Weights = number[]
+export const SEASONS: Season[] = [Season.WINTER, Season.SPRING, Season.SUMMER, Season.AUTUMN]
+
+export type Weights = number[][]
 
 export function evaluate(gameState: GameState, playerId: string, weights: Weights): number {
     const features = extractFeatures(gameState, playerId)
     if (gameState.isGameOver()) {
         return features[0] - features[features.length - 1] * 10
     }
-    const playerStatus = gameState.getPlayer(playerId).getStatus()
-    if (playerStatus === PlayerStatus.GAME_ENDED) {
-        weights = weights.map((w, i) => i === 0 || i === weights.length - 1 ? w : 0)
+    const player = gameState.getPlayer(playerId)
+    let row = weights[SEASONS.indexOf(player.currentSeason)]
+    if (player.getStatus() === PlayerStatus.GAME_ENDED) {
+        row = row.map((w, i) => i === 0 || i === row.length - 1 ? w : 0)
     }
-    return features.reduce((sum, feature, index) => sum + feature * (weights[index] ?? 0), 0)
+    return features.reduce((sum, feature, index) => sum + feature * (row[index] ?? 0), 0)
 }
 
 export function handTunedWeights(): Weights {
-    return [
+    const row = [
         1, // points; Fix weight
         0.7,  // twigs
         0.75,  // resin
@@ -31,23 +34,27 @@ export function handTunedWeights(): Weights {
         0.4,  // freeCitySpaces
         -1   // bestOponentsPoints
     ]
+    return SEASONS.map(() => row.slice())
 }
 
-function toFree(weights: Weights): Weights {
-    return weights.slice(1, weights.length)
+// Flattens to the optimizer's search vector; the points weight stays fixed at 1 in every season.
+export function toFree(weights: Weights): number[] {
+    return weights.reduce<number[]>((free, row) => free.concat(row.slice(1)), [])
 }
 
-function fromFree(free: Weights): Weights {
-    return [1, ...free]
+export function fromFree(free: number[]): Weights {
+    const k = free.length / SEASONS.length
+    return SEASONS.map((_, s) => [1, ...free.slice(s * k, (s + 1) * k)])
 }
 
-export function weightsToJSON(w: Weights): {featureNames: string[]; weights: Weights} {
+export function weightsToJSON(w: Weights): {featureNames: string[]; seasons: Season[]; weights: Weights} {
     return {
         featureNames: FEATURE_NAMES,
+        seasons: SEASONS,
         weights: w
     }
 }
 
-export function weightsFromJSON(json: {featureNames: string[]; weights: Weights}): Weights {
+export function weightsFromJSON(json: {featureNames: string[]; seasons: Season[]; weights: Weights}): Weights {
     return json.weights
 }
