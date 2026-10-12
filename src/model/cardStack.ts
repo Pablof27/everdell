@@ -1,6 +1,6 @@
 import { CardName } from "./types";
 import { CardStackJSON } from "./jsonTypes";
-import shuffle from "lodash/shuffle";
+import { shuffle } from "./random";
 import cloneDeep from "lodash/cloneDeep";
 
 /**

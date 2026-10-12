@@ -12,7 +12,7 @@ import { toGameText, resourceMapToGameText } from "./gameText";
 import { sumResources, GainAnyResource } from "./gameStatePlayHelpers";
 import { GameState, GameStatePlayFn } from "./gameState";
 import cloneDeep from "lodash/cloneDeep";
-import shuffle from "lodash/shuffle";
+import { shuffle } from "./random";
 
 export class TrainCarTile implements IGameTextEntity {
   readonly name: TrainCarTileName;

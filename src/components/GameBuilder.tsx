@@ -8,6 +8,7 @@ const getDummyPlayer = (name = "") => {
   playerIdx++;
   return {
     name: name || `Player ${playerIdx}`,
+    isBot: false,
   };
 };
 
@@ -69,6 +70,16 @@ const GameBuilder: React.FC = () => {
                                   e.target.select();
                                 }}
                               />
+                              <label
+                                className={styles.game_builder_player_bot}
+                                title="Played by the computer"
+                              >
+                                <Field
+                                  type="checkbox"
+                                  name={`players.${idx}.isBot`}
+                                />
+                                {"Bot"}
+                              </label>
                               {numPlayers > 2 && (
                                 <button
                                   type="button"

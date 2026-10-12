@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import shuffle from "lodash/shuffle";
 import { createGame } from "../../model/game";
+import { playBotTurns } from "../../bot/botRunner";
 
 export default async (
   req: NextApiRequest,
@@ -28,6 +29,13 @@ export default async (
     });
     return;
   }
+  if (body.players.every((p: any) => !!p.isBot)) {
+    res.status(400).json({
+      success: false,
+      error: "At least one player must be human",
+    });
+    return;
+  }
   const players = body.randomizeStartingPlayer
     ? shuffle([...body.players])
     : [...body.players];
@@ -52,7 +60,10 @@ export default async (
     ? { forestLocations: true, specialEvents: true, basicEvents: true }
     : {};
   const game = await createGame(
-    players.map((p: any) => p.name),
+    players.map((p: any) => ({
+      name: p.name,
+      botType: p.isBot ? ("RANDOM" as const) : null,
+    })),
     {
       allowUndo,
       chooseStartingResources,
@@ -62,6 +73,12 @@ export default async (
       bellfaire,
     }
   );
+  // A bot may have been picked as the starting player.
+  try {
+    await playBotTurns(game);
+  } catch (e) {
+    console.error(`Bot failed in game ${game.gameId}`, e);
+  }
   res.json({
     success: "ok",
     gameUrl: `/game/${game.gameId}?gameSecret=${game.gameSecretUNSAFE}`,

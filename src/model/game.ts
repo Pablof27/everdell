@@ -1,7 +1,7 @@
 import { generate as uuid } from "short-uuid";
 import { Player, createPlayer } from "./player";
 import { GameState } from "./gameState";
-import { GameOptions, GameInput } from "./types";
+import { BotType, GameOptions, GameInput } from "./types";
 import { GameJSON } from "./jsonTypes";
 import { getGameJSONById, saveGameJSONById } from "./db";
 import cloneDeep from "lodash/cloneDeep";
@@ -47,6 +47,10 @@ export class Game {
 
   getGameInputs(): GameInput[] {
     return this.gameState.getPossibleGameInputs();
+  }
+
+  getGameState(): GameState {
+    return this.gameState;
   }
 
   getGameStateId(): number {
@@ -106,18 +110,22 @@ export const createGameFromGameState = async (
   return game;
 };
 
+export type NewGamePlayer = { name: string; botType?: BotType | null };
+
 export const createGame = async (
-  playerNames: string[],
+  playersToCreate: NewGamePlayer[],
   gameOptions: Partial<GameOptions> = {
     realtimePoints: false,
   }
 ): Promise<Game> => {
-  if (playerNames.length < 2 || playerNames.length > 4) {
+  if (playersToCreate.length < 2 || playersToCreate.length > 4) {
     throw new Error(
-      `Unable to create a game with ${playerNames.length} players`
+      `Unable to create a game with ${playersToCreate.length} players`
     );
   }
-  const players = playerNames.map((name) => createPlayer(name));
+  const players = playersToCreate.map(({ name, botType }) =>
+    createPlayer(name, { botType })
+  );
   const gameState = GameState.initialGameState({ players, gameOptions });
   const game = await createGameFromGameState(gameState);
   console.log(`Game created: ${game.gameId}`);

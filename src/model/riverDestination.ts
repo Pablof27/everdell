@@ -1,4 +1,4 @@
-import shuffle from "lodash/shuffle";
+import { shuffle } from "./random";
 import cloneDeep from "lodash/cloneDeep";
 import mapValues from "lodash/mapValues";
 import uniq from "lodash/uniq";
@@ -207,10 +207,10 @@ export class RiverDestinationMap {
     player
       .getPlayedCardForCardName(messenger.name)
       .forEach(({ shareSpaceWith }) => {
+        // An unpaired Messenger (its Construction was removed) just counts
+        // as a regular TRAVELER.
         if (!shareSpaceWith) {
-          throw new Error(
-            "Messenger not sharing a space with any Construction."
-          );
+          return;
         }
         const card = Card.fromName(shareSpaceWith);
         adjustCountsBy[messenger.cardType] -= 1;

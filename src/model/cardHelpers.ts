@@ -99,7 +99,11 @@ export function onlyRelevantProductionCards(
     if (!card.productionWillActivate(gameState, cardOwner, playedCard)) {
       return false;
     }
-    if (cardName === CardName.STOREHOUSE && cardOwnerId !== player.playerId) {
+    // Resources for these live on the card itself, so only the owner benefits.
+    if (
+      (cardName === CardName.STOREHOUSE || cardName === CardName.FREIGHT_CAR) &&
+      cardOwnerId !== player.playerId
+    ) {
       return false;
     }
     return true;

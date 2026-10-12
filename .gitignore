@@ -38,3 +38,4 @@ cypress/videos
 cypress/screenshots
 
 tsconfig.tsbuildinfo
+/docs

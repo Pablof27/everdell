@@ -11,7 +11,7 @@ import { GameState, GameStatePointsFn } from "./gameState";
 import { Player } from "./player";
 import { toGameText } from "./gameText";
 import cloneDeep from "lodash/cloneDeep";
-import shuffle from "lodash/shuffle";
+import { shuffle } from "./random";
 import { VisitorStackJSON } from "./jsonTypes";
 
 // Newleaf Visitors

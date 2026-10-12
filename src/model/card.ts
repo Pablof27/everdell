@@ -508,6 +508,29 @@ export class Card<TCardType extends CardType = CardType>
   }
 }
 
+// Opponents' DESTINATION cards the active player could visit via the Conductor.
+function getConductorCopyableCards(gameState: GameState): PlayedCardInfo[] {
+  const player = gameState.getActivePlayer();
+  const destinationCards: PlayedCardInfo[] = [];
+  gameState.players
+    .filter((p) => p.playerId !== player.playerId)
+    .forEach((otherPlayer) => {
+      destinationCards.push(
+        ...otherPlayer.getAllPlayedCardsByType(CardType.DESTINATION)
+      );
+    });
+  return destinationCards.filter((playedCard) => {
+    // Copying another Conductor would recurse forever.
+    if (playedCard.cardName === CardName.CONDUCTOR) {
+      return false;
+    }
+    return Card.fromName(playedCard.cardName).canPlay(gameState, {
+      inputType: GameInputType.VISIT_DESTINATION_CARD,
+      clientOptions: { playedCard },
+    });
+  });
+}
+
 const CARD_REGISTRY: Record<CardName, Card> = {
   [CardName.ARCHITECT]: new Card({
     name: CardName.ARCHITECT,
@@ -934,8 +957,13 @@ const CARD_REGISTRY: Record<CardName, Card> = {
             }
             const location = Location.fromName(workerInfo.location);
             return (
-              location.type === LocationType.BASIC ||
-              location.type === LocationType.FOREST
+              (location.type === LocationType.BASIC ||
+                location.type === LocationType.FOREST) &&
+              // eg. discard locations need cards in hand to be activated
+              !location.canPlayCheck(gameState, {
+                inputType: GameInputType.PLACE_WORKER,
+                clientOptions: { location: location.name },
+              })
             );
           });
         if (basicAndForestLocationOptions.length !== 0) {
@@ -3570,13 +3598,18 @@ const CARD_REGISTRY: Record<CardName, Card> = {
         if (!gameInput.cardOptions.find((x) => isEqual(x, selectedCards[0]))) {
           throw new Error("Please select an option");
         }
-        let selectedPlayedCard = player.findPlayedCard(selectedCards[0]);
+        // The Messenger may belong to an opponent (eg. a Pirate Ship moved
+        // into their city forced the relocation).
+        const owner = gameInput.playedCardContext
+          ? gameState.getPlayer(gameInput.playedCardContext.cardOwnerId)
+          : player;
+        let selectedPlayedCard = owner.findPlayedCard(selectedCards[0]);
         if (!selectedPlayedCard) {
           throw new Error("Could not find selected card in your city.");
         }
         let playedMessenger =
           gameInput.playedCardContext &&
-          player.findPlayedCard(gameInput.playedCardContext);
+          owner.findPlayedCard(gameInput.playedCardContext);
         if (!playedMessenger) {
           throw new Error("Could not find Messenger your city.");
         }
@@ -3586,21 +3619,21 @@ const CARD_REGISTRY: Record<CardName, Card> = {
           );
         }
         gameState.addGameLogFromCard(CardName.MESSENGER, [
-          player,
+          owner,
           " added ",
           Card.fromName(CardName.MESSENGER),
           " to the same space as ",
           Card.fromName(selectedPlayedCard.cardName),
           ".",
         ]);
-        selectedPlayedCard = player.updatePlayedCard(
+        selectedPlayedCard = owner.updatePlayedCard(
           gameState,
           selectedPlayedCard,
           {
             shareSpaceWith: CardName.MESSENGER,
           }
         );
-        playedMessenger = player.updatePlayedCard(gameState, playedMessenger, {
+        playedMessenger = owner.updatePlayedCard(gameState, playedMessenger, {
           shareSpaceWith: selectedPlayedCard.cardName,
         });
       }
@@ -4031,12 +4064,14 @@ const CARD_REGISTRY: Record<CardName, Card> = {
             return p
               .getAllPlayedCardsByType(CardType.TRAVELER)
               .filter((playedCard) => {
-                // Filter out cards that can't be copied
+                // Filter out cards that can't be copied (copying another
+                // Air Balloon would recurse forever).
                 const cardName = playedCard.cardName;
                 return ![
                   CardName.FOOL,
                   CardName.MAIN_ROAD,
                   CardName.RUINS,
+                  CardName.AIR_BALLOON,
                 ].includes(cardName);
               });
           });
@@ -4350,31 +4385,19 @@ const CARD_REGISTRY: Record<CardName, Card> = {
     baseCost: {
       [ResourceType.BERRY]: 3,
     },
+    canPlayCheckInner: (gameState: GameState, gameInput: GameInput) => {
+      if (
+        gameInput.inputType === GameInputType.VISIT_DESTINATION_CARD &&
+        getConductorCopyableCards(gameState).length === 0
+      ) {
+        return "No DESTINATION cards available to copy.";
+      }
+      return null;
+    },
     playInner: (gameState: GameState, gameInput: GameInput) => {
       const player = gameState.getActivePlayer();
       if (gameInput.inputType === GameInputType.VISIT_DESTINATION_CARD) {
-        let destinationCards = [] as PlayedCardInfo[];
-        const players = gameState.players
-          .filter((p) => p.playerId !== player.playerId)
-          .map((p) => p.playerId);
-
-        players.forEach((p) => {
-          const otherPlayer = gameState.getPlayer(p);
-          destinationCards.push(
-            ...otherPlayer.getAllPlayedCardsByType(CardType.DESTINATION)
-          );
-        });
-
-        // filter out the ones that the player cannot play / utilize
-        destinationCards = destinationCards.filter((playedCard) => {
-          const card = Card.fromName(playedCard.cardName);
-          return card.canPlay(gameState, {
-            inputType: GameInputType.VISIT_DESTINATION_CARD,
-            clientOptions: {
-              playedCard,
-            },
-          });
-        });
+        const destinationCards = getConductorCopyableCards(gameState);
 
         if (destinationCards.length === 0) {
           // This should never happen because there are unlimited basic locations.
@@ -4491,6 +4514,13 @@ const CARD_REGISTRY: Record<CardName, Card> = {
           ]);
           return;
         }
+        // Set the card aside now: another effect resolving in between
+        // (eg. Tea House) could otherwise give it away first.
+        player.removeCardFromHand(
+          gameState,
+          gameInput.clientOptions.selectedCards[0],
+          false
+        );
         gameState.pendingGameInputs.push({
           inputType: GameInputType.SELECT_PLAYER,
           label: "Select player to give a CARD to",
@@ -4525,7 +4555,6 @@ const CARD_REGISTRY: Record<CardName, Card> = {
         }
 
         const cardToGive = gameInput.prevInput.clientOptions.selectedCards[0];
-        player.removeCardFromHand(gameState, cardToGive, false);
         selectedPlayer.addCardToHand(gameState, cardToGive);
 
         // give rewards
@@ -5452,6 +5481,19 @@ const CARD_REGISTRY: Record<CardName, Card> = {
           throw new Error("May not select Magician");
         }
 
+        // Discard right away: the city may change before the resource is
+        // chosen (eg. a Miner Mole copying an opponent's Magician).
+        const cardToRemove = gameInput.clientOptions.selectedCards[0];
+        const removedCard = Card.fromName(cardToRemove.cardName);
+        gameState.addGameLogFromCard(CardName.MAGICIAN, [
+          player,
+          " discarded ",
+          removedCard,
+          ` from their city and gained 1 VP.`,
+        ]);
+        player.removeCardFromCity(gameState, cardToRemove, true);
+        player.gainResources(gameState, { [ResourceType.VP]: 1 });
+
         gameState.pendingGameInputs.push(
           gainAnyHelper.getGameInput({
             prevInputType: gameInput.inputType,
@@ -5464,20 +5506,6 @@ const CARD_REGISTRY: Record<CardName, Card> = {
         !!gameInput.prevInput &&
         gameInput.prevInput.inputType === GameInputType.SELECT_PLAYED_CARDS
       ) {
-        const prevInput = gameInput.prevInput;
-        const cardToRemove = prevInput.clientOptions.selectedCards[0];
-        const removedCard = Card.fromName(cardToRemove.cardName);
-        gameState.addGameLogFromCard(CardName.MAGICIAN, [
-          player,
-          " discarded ",
-          removedCard,
-          ` from their city and gained 1 VP.`,
-        ]);
-
-        // Remove card from city + put in discard pile
-        player.removeCardFromCity(gameState, cardToRemove, true);
-
-        player.gainResources(gameState, { [ResourceType.VP]: 1 });
         gainAnyHelper.play(gameState, gameInput);
       }
     },
@@ -5885,6 +5913,13 @@ const CARD_REGISTRY: Record<CardName, Card> = {
           ]);
           return;
         }
+        // Set the card aside now: another effect resolving in between
+        // (eg. a 2nd Tea House) could otherwise give it away first.
+        player.removeCardFromHand(
+          gameState,
+          gameInput.clientOptions.selectedCards[0],
+          false
+        );
         gameState.pendingGameInputs.push({
           inputType: GameInputType.SELECT_PLAYER,
           label: "Select player to give a CARD to",
@@ -5919,7 +5954,6 @@ const CARD_REGISTRY: Record<CardName, Card> = {
         }
 
         const cardToGive = gameInput.prevInput.clientOptions.selectedCards[0];
-        player.removeCardFromHand(gameState, cardToGive, false);
         selectedPlayer.addCardToHand(gameState, cardToGive);
 
         gameState.addGameLogFromCard(CardName.TEA_HOUSE, [

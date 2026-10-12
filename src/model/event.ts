@@ -26,7 +26,7 @@ import {
   GameStateCanPlayCheckFn,
 } from "./gameState";
 import { sumResources, GainMoreThan1AnyResource } from "./gameStatePlayHelpers";
-import shuffle from "lodash/shuffle";
+import { shuffle } from "./random";
 import {
   toGameText,
   cardListToGameText,
@@ -569,11 +569,8 @@ const EVENT_REGISTRY: Record<EventName, Event> = {
           throw new Error("invalid input");
         }
 
-        const numTwigs = resources[ResourceType.TWIG];
-
-        if (!numTwigs) {
-          throw new Error("must provide number of twigs");
-        }
+        // "up to 3": placing none is allowed.
+        const numTwigs = resources[ResourceType.TWIG] || 0;
 
         if (numTwigs > 3) {
           throw new Error("too many twigs");
@@ -1201,10 +1198,8 @@ const EVENT_REGISTRY: Record<EventName, Event> = {
         if (!resources) {
           throw new Error("Invalid input");
         }
-        const numBerries = resources[ResourceType.BERRY];
-        if (!numBerries) {
-          throw new Error("Must provide number of berries");
-        }
+        // "up to 3": placing none is allowed.
+        const numBerries = resources[ResourceType.BERRY] || 0;
         if (numBerries > 3) {
           throw new Error("Select up to 3 berries");
         }
