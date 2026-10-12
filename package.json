@@ -12,6 +12,7 @@
     "test": "rm -rf ./db/test.sqlite && DB_PATH=./db/test.sqlite mocha -r ts-eager/register src/**/*.test.ts",
     "test:watch": "nodemon -e ts,tsx -w src -x 'npm run test'",
     "arena": "node -r ts-eager/register src/bot/arenaCli.ts",
+    "evolve": "node -r ts-eager/register src/bot/evolveCli.ts",
     "test-cypress": "DB_PATH=./db/game.sqlite cypress open",
     "typecheck": "tsc",
     "typecheck:watch": "tsc --watch",

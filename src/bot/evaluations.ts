@@ -56,5 +56,11 @@ export function weightsToJSON(w: Weights): {featureNames: string[]; seasons: Sea
 }
 
 export function weightsFromJSON(json: {featureNames: string[]; seasons: Season[]; weights: Weights}): Weights {
+    if (JSON.stringify(json.featureNames) !== JSON.stringify(FEATURE_NAMES)) {
+        throw new Error(`Weights were saved for features [${json.featureNames}], expected [${FEATURE_NAMES}]`)
+    }
+    if (JSON.stringify(json.seasons) !== JSON.stringify(SEASONS)) {
+        throw new Error(`Weights were saved for seasons [${json.seasons}], expected [${SEASONS}]`)
+    }
     return json.weights
 }

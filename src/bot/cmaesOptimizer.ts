@@ -1,6 +1,18 @@
 import { Optimizer } from './optimizer';
 import { createSeededRng, Rng } from '../model/random';
 
+export type CMAESState = {
+    mean: number[]
+    sigma: number
+    lambda: number
+    minSigma: number
+    seed?: number
+    generation: number
+    C: number[][]
+    ps: number[]
+    pc: number[]
+}
+
 // Hansen's (mu/mu_w, lambda)-CMA-ES. Fitness is MINIMIZED.
 export class CMAESOptimizer implements Optimizer {
 
@@ -17,7 +29,8 @@ export class CMAESOptimizer implements Optimizer {
     private readonly c1: number
     private readonly cmu: number
     private readonly chiN: number
-    private readonly rng: Rng
+    private readonly minSigma: number
+    private readonly seed?: number
 
     private m: number[]
     private _sigma: number
@@ -27,9 +40,8 @@ export class CMAESOptimizer implements Optimizer {
     private ps: number[]
     private pc: number[]
     private g = 0
-    private spareGaussian: number | null = null
 
-    constructor(opts: { mean: number[]; sigma: number; lambda?: number; seed?: number }) {
+    constructor(opts: { mean: number[]; sigma: number; lambda?: number; seed?: number; minSigma?: number }) {
         const n = opts.mean.length
         if (n === 0) {
             throw new Error('CMA-ES needs at least one dimension')
@@ -37,7 +49,8 @@ export class CMAESOptimizer implements Optimizer {
         this.n = n
         this.m = opts.mean.slice()
         this._sigma = opts.sigma
-        this.rng = opts.seed === undefined ? Math.random : createSeededRng(opts.seed)
+        this.minSigma = opts.minSigma ?? 0
+        this.seed = opts.seed
 
         this.lambda = opts.lambda ?? 4 + Math.floor(3 * Math.log(n))
         this.mu = Math.floor(this.lambda / 2)
@@ -72,10 +85,36 @@ export class CMAESOptimizer implements Optimizer {
         return this.g
     }
 
+    getState(): CMAESState {
+        return {
+            mean: this.m.slice(),
+            sigma: this._sigma,
+            lambda: this.lambda,
+            minSigma: this.minSigma,
+            seed: this.seed,
+            generation: this.g,
+            C: this.C.map((row) => row.slice()),
+            ps: this.ps.slice(),
+            pc: this.pc.slice(),
+        }
+    }
+
+    static fromState(state: CMAESState): CMAESOptimizer {
+        const es = new CMAESOptimizer(state)
+        es.g = state.generation
+        es.C = state.C.map((row) => row.slice())
+        es.ps = state.ps.slice()
+        es.pc = state.pc.slice()
+        es.refreshEigen()
+        return es
+    }
+
+    // Seeded per generation so a run resumed from getState() samples exactly as an uninterrupted one.
     ask(): number[][] {
         const { n } = this
+        const rng = this.seed === undefined ? Math.random : createSeededRng(this.seed * 1000003 + this.g)
         return Array.from({ length: this.lambda }, () => {
-            const dz = Array.from({ length: n }, (_, j) => this.D[j] * this.gaussian())
+            const dz = Array.from({ length: n }, (_, j) => this.D[j] * gaussian(rng))
             const y = matVec(this.B, dz)
             return this.m.map((mj, j) => mj + this._sigma * y[j])
         })
@@ -119,29 +158,24 @@ export class CMAESOptimizer implements Optimizer {
             }
         }
 
-        this._sigma *= Math.exp((this.cs / this.ds) * (psNorm / this.chiN - 1))
+        this._sigma = Math.max(this.minSigma, this._sigma * Math.exp((this.cs / this.ds) * (psNorm / this.chiN - 1)))
 
-        const { values, vectors } = symmetricEigen(this.C)
-        this.B = vectors
-        this.D = values.map((v) => Math.sqrt(Math.max(v, 1e-20)))
-
+        this.refreshEigen()
         this.g++
     }
 
-    // Box-Muller, caching the second sample.
-    private gaussian(): number {
-        if (this.spareGaussian !== null) {
-            const s = this.spareGaussian
-            this.spareGaussian = null
-            return s
-        }
-        let u = 0
-        while (u === 0) u = this.rng()
-        const v = this.rng()
-        const r = Math.sqrt(-2 * Math.log(u))
-        this.spareGaussian = r * Math.sin(2 * Math.PI * v)
-        return r * Math.cos(2 * Math.PI * v)
+    private refreshEigen(): void {
+        const { values, vectors } = symmetricEigen(this.C)
+        this.B = vectors
+        this.D = values.map((v) => Math.sqrt(Math.max(v, 1e-20)))
     }
+}
+
+// Box-Muller.
+function gaussian(rng: Rng): number {
+    let u = 0
+    while (u === 0) u = rng()
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rng())
 }
 
 function identity(n: number): number[][] {
