@@ -2,10 +2,14 @@
 //
 //   npm run arena -- [--games=100] [--seed=1] [--bots=RANDOM,RANDOM]
 //                    [--pearlbrook] [--newleaf] [--bellfaire] [--verbose]
+//
+// A GREEDY bot can load weights: --bots=GREEDY:weights/run1/greedy-evolved.json,GREEDY
+import fs from "fs";
 import { BotType, GameOptions } from "../model/types";
 import { createSeededRng } from "../model/random";
 import { createBot } from "./bot";
 import { runArena } from "./arena";
+import { weightsFromJSON } from "./evaluations";
 
 function parseArgs(argv: string[]): Record<string, string | boolean> {
   const args: Record<string, string | boolean> = {};
@@ -22,7 +26,12 @@ function main(): void {
   const args = parseArgs(process.argv.slice(2));
   const numGames = parseInt(String(args.games || "100"), 10);
   const seed = parseInt(String(args.seed || "1"), 10);
-  const botTypes = String(args.bots || "RANDOM,RANDOM").split(",") as BotType[];
+  const botSpecs = String(args.bots || "RANDOM,RANDOM")
+    .split(",")
+    .map((spec) => {
+      const [botType, weightsFile] = spec.split(":");
+      return { botType: botType as BotType, weightsFile };
+    });
   const verbose = !!args.verbose;
 
   const gameOptions: Partial<GameOptions> = {};
@@ -50,8 +59,13 @@ function main(): void {
     };
   }
 
-  const bots = botTypes.map((botType, idx) =>
-    createBot(botType, { rng: createSeededRng(seed * 1000 + idx) })
+  const bots = botSpecs.map(({ botType, weightsFile }, idx) =>
+    createBot(botType, {
+      rng: createSeededRng(seed * 1000 + idx),
+      weights: weightsFile
+        ? weightsFromJSON(JSON.parse(fs.readFileSync(weightsFile, "utf8")))
+        : undefined,
+    })
   );
   const names = bots.map((bot, idx) => `${bot.name}#${idx + 1}`);
 
@@ -59,6 +73,11 @@ function main(): void {
     `Playing ${numGames} games: ${names.join(" vs ")} ` +
       `(seed=${seed}, options=${JSON.stringify(gameOptions)})`
   );
+  botSpecs.forEach(({ weightsFile }, idx) => {
+    if (weightsFile) {
+      console.log(`  ${names[idx]} weights: ${weightsFile}`);
+    }
+  });
 
   const rejected: Record<string, number> = {};
   const summary = runArena({

@@ -10,6 +10,7 @@ import {
   CardName,
   CardPaymentOptions,
   CardWithSource,
+  EventName,
   GameInput,
   GameInputMultiStep,
   GameInputPlayCard,
@@ -222,17 +223,39 @@ function getPlayCardMoves(
       });
   }
 
+  const fitsAfterRemoving = new Map<CardName, boolean>();
+  const fitsInCity = (paymentOptions: CardPaymentOptions): boolean => {
+    if (player.canAddToCity(card.name, true /* strict */)) {
+      return true;
+    }
+    // A full city only accepts payments that remove a card that actually frees a space
+    // (not e.g. a Wanderer, or a Husband sharing a space with a Wife).
+    const removed =
+      paymentOptions.cardToDungeon ??
+      (paymentOptions.cardToUse === CardName.INNKEEPER ||
+      paymentOptions.cardToUse === CardName.CRANE ||
+      paymentOptions.cardToUse === CardName.INVENTOR
+        ? paymentOptions.cardToUse
+        : undefined);
+    if (!removed) {
+      return false;
+    }
+    if (!fitsAfterRemoving.has(removed)) {
+      const json = player.toJSON(true);
+      const after = Player.fromJSON({
+        ...json,
+        playedCards: {
+          ...json.playedCards,
+          [removed]: (json.playedCards[removed] || []).slice(1),
+        },
+      });
+      fitsAfterRemoving.set(removed, after.canAddToCity(card.name, true));
+    }
+    return fitsAfterRemoving.get(removed)!;
+  };
+
   return payments
-    .filter((paymentOptions) => {
-      // A full city only accepts payments that remove a card from it.
-      return (
-        player.canAddToCity(card.name, true /* strict */) ||
-        !!paymentOptions.cardToDungeon ||
-        paymentOptions.cardToUse === CardName.INNKEEPER ||
-        paymentOptions.cardToUse === CardName.CRANE ||
-        paymentOptions.cardToUse === CardName.INVENTOR
-      );
-    })
+    .filter(fitsInCity)
     .map((paymentOptions) => ({
       inputType: GameInputType.PLAY_CARD,
       clientOptions: {
@@ -381,11 +404,17 @@ function getPendingInputMoves(
         )
         .filter((x): x is NonNullable<typeof x> => !!x);
     case GameInputType.SELECT_WORKER_PLACEMENT: {
-      // Clock Tower / train ticket / Ranger all activate the chosen spot.
+      // Clock Tower, train ticket and Ranger's second step activate the chosen spot;
+      // Ranger's first step and A Wee Run City only pick a worker to recall.
+      const activatesSpot =
+        pending.prevInputType !== GameInputType.PLAY_CARD &&
+        pending.prevInputType !== GameInputType.CLAIM_EVENT;
       const choices = [
         ...pending.options.filter(
           (option) =>
-            !option.location || canTriggerLocation(gameState, option.location)
+            !activatesSpot ||
+            !option.location ||
+            canTriggerLocation(gameState, option.location)
         ),
         ...(pending.mustSelectOne ? [] : [null]),
       ];
@@ -404,11 +433,20 @@ function getPendingInputMoves(
       if (allOrNothing) {
         minToSelect = pending.maxToSelect;
       }
+      // Giving 0 re-asks the same question forever; declining is the SELECT_PLAYER null option.
+      if (pending.eventContext === EventName.SPECIAL_MASQUERADE_INVITATIONS) {
+        minToSelect = Math.max(1, minToSelect);
+      }
+      // Filtered below, so enumerate every pair first: capping before filtering can leave nothing.
+      const drawTwoFromMeadow =
+        pending.locationContext ===
+          LocationName.FOREST_DRAW_TWO_MEADOW_PLAY_ONE_FOR_ONE_LESS &&
+        pending.prevInputType === GameInputType.PLACE_WORKER;
       let subsets = pickSubsets(
         pending.cardOptions,
         minToSelect,
         pending.maxToSelect,
-        maxPerInput,
+        drawTwoFromMeadow ? Infinity : maxPerInput,
         rng
       );
       if (allOrNothing) {
@@ -424,18 +462,18 @@ function getPendingInputMoves(
         }
         subsets.push([]);
       }
-      if (
-        pending.locationContext ===
-          LocationName.FOREST_DRAW_TWO_MEADOW_PLAY_ONE_FOR_ONE_LESS &&
-        pending.prevInputType === GameInputType.PLACE_WORKER
-      ) {
+      if (drawTwoFromMeadow) {
         // The location insists that one of the 2 drawn cards is playable.
-        subsets = subsets.filter((cards) =>
-          cards.some(
-            (cardName) =>
-              player.canAffordCard(cardName, null, "ANY 1") &&
-              Card.fromName(cardName).canPlayIgnoreCostAndSource(gameState)
-          )
+        subsets = capList(
+          subsets.filter((cards) =>
+            cards.some(
+              (cardName) =>
+                player.canAffordCard(cardName, null, "ANY 1") &&
+                Card.fromName(cardName).canPlayIgnoreCostAndSource(gameState)
+            )
+          ),
+          maxPerInput,
+          rng
         );
       }
       return subsets.map((selectedCards) => ({
@@ -513,8 +551,13 @@ function getPendingInputMoves(
           ? onCard[r] || 0
           : pending.maxResources
       );
+      // Donating 0 re-asks the same question forever; declining is the SELECT_PLAYER null option.
+      const minResources =
+        pending.eventContext === EventName.SPECIAL_A_BRILLIANT_MARKETING_PLAN
+          ? Math.max(1, pending.minResources)
+          : pending.minResources;
       return capList(
-        getResourceSplits(limits, pending.minResources, pending.maxResources),
+        getResourceSplits(limits, minResources, pending.maxResources),
         maxPerInput,
         rng
       ).map((vec) => {

@@ -59,8 +59,19 @@ export class GreedyBot implements Bot {
 
         while (!s.isGameOver() && s.pendingGameInputs.length > 0
                 && s.getActivePlayer().playerId === me && depth < MAX_DEPTH) {
-            let option = getLegalMoves(s, { maxPerInput: 16, rng: this.rng })
-            s = maxBy(option.map(option => s.next(cloneDeep(option), true, true)), g => this.valueFor(g, me))!
+            const successors: GameState[] = []
+            for (const option of getLegalMoves(s, { maxPerInput: 16, rng: this.rng })) {
+                try {
+                    successors.push(s.next(cloneDeep(option), true, true))
+                } catch (e) {
+                    continue
+                }
+            }
+            const best = maxBy(successors, g => this.valueFor(g, me))
+            if (!best) {
+                break
+            }
+            s = best
             depth++
         }
 

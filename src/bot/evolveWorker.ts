@@ -18,18 +18,45 @@ export type WorkerReply =
 process.on("message", (job: WorkerJob) => {
   let reply: WorkerReply;
   try {
-    const result = evaluateWeights(job.weights, {
-      reference: (seat, seed) =>
-        new GreedyBot({
-          name: "Reference",
-          rng: createSeededRng(seed * 13 + seat),
-          weights: job.referenceWeights,
-        }),
-      seeds: job.seeds,
+    const parts = job.seeds.flatMap((seed) => {
+      try {
+        return [evaluateSeed(job, seed)];
+      } catch (err) {
+        // Skips both seat orders of the seed so the remaining games stay paired.
+        const msg = String((err as Error).message).split("\n")[0];
+        console.warn(`Skipped seed ${seed}: ${msg}`);
+        return [];
+      }
     });
-    reply = { id: job.id, result };
+    const games = parts.reduce((s, p) => s + p.games, 0);
+    if (games === 0) {
+      throw new Error(`Every seed failed: ${job.seeds}`);
+    }
+    reply = {
+      id: job.id,
+      result: {
+        meanMargin: parts.reduce((s, p) => s + p.meanMargin * p.games, 0) / games,
+        winRate: parts.reduce((s, p) => s + p.winRate * p.games, 0) / games,
+        games,
+      },
+    };
   } catch (err) {
     reply = { id: job.id, error: String((err as Error).stack || err) };
   }
-  process.send!(reply);
+  // The callback swallows EPIPE when the parent has already exited.
+  process.send!(reply, () => undefined);
 });
+
+process.on("disconnect", () => process.exit(0));
+
+function evaluateSeed(job: WorkerJob, seed: number): FitnessResult {
+  return evaluateWeights(job.weights, {
+    reference: (seat, s) =>
+      new GreedyBot({
+        name: "Reference",
+        rng: createSeededRng(s * 13 + seat),
+        weights: job.referenceWeights,
+      }),
+    seeds: [seed],
+  });
+}
