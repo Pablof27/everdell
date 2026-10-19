@@ -2,8 +2,12 @@
 //
 //   npm run evolve -- [--generations=60] [--games=64] [--curveGames=64] [--sigma=0.15]
 //                     [--minSigma=0.001] [--lambda=N] [--seed=1] [--workers=N]
+//                     [--tailThreshold=30] [--tailWeight=1]
 //                     [--reference=weights/greedy.json] [--out=weights/run1]
 //                     [--resume=weights/run1/checkpoints/gen-010.json]
+//
+// Fitness = mean margin - tailWeight * mean(max(0, tailThreshold - own points)); --tailWeight=0
+// optimizes the margin alone. Pass the same tail flags when resuming.
 //
 // Writes <out>/progress.csv, <out>/checkpoints/gen-XXX.json and <out>/greedy-evolved.json.
 import { fork, ChildProcess } from "child_process";
@@ -131,7 +135,22 @@ async function evaluateParallel(
     meanMargin: parts.reduce((s, p) => s + p.meanMargin * p.games, 0) / games,
     winRate: parts.reduce((s, p) => s + p.winRate * p.games, 0) / games,
     games,
+    points: parts.flatMap((p) => p.points),
   };
+}
+
+function mean(xs: number[]): number {
+  return xs.reduce((s, x) => s + x, 0) / xs.length;
+}
+
+function percentile(xs: number[], q: number): number {
+  const sorted = xs.slice().sort((a, b) => a - b);
+  return sorted[Math.floor(q * (sorted.length - 1))];
+}
+
+// Mean number of points by which the candidate falls short of `threshold` (0 for good games).
+function shortfall(points: number[], threshold: number): number {
+  return mean(points.map((p) => Math.max(0, threshold - p)));
 }
 
 function range(start: number, count: number): number[] {
@@ -157,6 +176,8 @@ async function main(): Promise<void> {
   const pairs = Math.max(1, Math.floor(int("games", 64) / 2));
   const curvePairs = Math.max(1, Math.floor(int("curveGames", pairs * 2) / 2));
   const numWorkers = Math.max(1, int("workers", os.cpus().length - 1));
+  const tailThreshold = num("tailThreshold", 30);
+  const tailWeight = num("tailWeight", 1);
   if (pairs > MAX_PAIRS || curvePairs > MAX_PAIRS) {
     throw new Error(`At most ${MAX_PAIRS * 2} games per candidate`);
   }
@@ -169,6 +190,13 @@ async function main(): Promise<void> {
     es = CMAESOptimizer.fromState(checkpoint.es);
     referenceWeights = weightsFromJSON(checkpoint.reference);
     seed = checkpoint.seed;
+    const numFree = toFree(referenceWeights).length;
+    if (es.mean.length !== numFree) {
+      throw new Error(
+        `Checkpoint has ${es.mean.length} free weights but the current features need ${numFree}. ` +
+          `Start a new run with --reference=<weights file> instead of resuming.`
+      );
+    }
   } else {
     referenceWeights = args.reference
       ? weightsFromJSON(readJSON<WeightsJSON>(String(args.reference)))
@@ -190,14 +218,15 @@ async function main(): Promise<void> {
   if (!fs.existsSync(csvFile)) {
     fs.writeFileSync(
       csvFile,
-      "gen,bestF,medianF,curveMargin,curveWinRate,sigma,seconds\n"
+      "gen,bestF,medianF,curveMargin,curveWinRate,curvePoints,curveP05,curveShortfall,sigma,seconds\n"
     );
   }
 
   const chunkPairs = Math.max(1, Math.ceil(Math.max(pairs, curvePairs) / numWorkers));
   console.log(
     `CMA-ES on ${es.mean.length} weights, ${pairs * 2} games/candidate, ` +
-      `${numWorkers} workers, seed=${seed}, out=${out}`
+      `${numWorkers} workers, seed=${seed}, out=${out}, ` +
+      `fitness = margin - ${tailWeight} * shortfall below ${tailThreshold} VP`
   );
 
   const pool = new WorkerPool(numWorkers);
@@ -215,7 +244,9 @@ async function main(): Promise<void> {
           evaluateParallel(pool, fromFree(x), referenceWeights, seeds, chunkPairs)
         )
       );
-      const fitness = results.map((r) => -r.meanMargin);
+      const fitness = results.map(
+        (r) => -(r.meanMargin - tailWeight * shortfall(r.points, tailThreshold))
+      );
       es.tell(candidates, fitness);
 
       const meanWeights = fromFree(es.mean);
@@ -235,13 +266,17 @@ async function main(): Promise<void> {
         sorted[Math.floor(sorted.length / 2)].toFixed(3),
         curve.meanMargin.toFixed(3),
         curve.winRate.toFixed(3),
+        mean(curve.points).toFixed(2),
+        percentile(curve.points, 0.05).toFixed(0),
+        shortfall(curve.points, tailThreshold).toFixed(3),
         es.sigma.toFixed(5),
         seconds.toFixed(1),
       ];
       fs.appendFileSync(csvFile, row.join(",") + "\n");
       console.log(
         `gen ${gen}: best f=${row[1]} median f=${row[2]} ` +
-          `curve margin=${row[3]} win=${row[4]} sigma=${row[5]} (${row[6]}s)`
+          `curve margin=${row[3]} win=${row[4]} points=${row[5]} p05=${row[6]} ` +
+          `shortfall=${row[7]} sigma=${row[8]} (${row[9]}s)`
       );
 
       const checkpoint: Checkpoint = {

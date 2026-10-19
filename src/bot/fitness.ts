@@ -5,7 +5,8 @@ import { GreedyBot } from './greedyBot';
 import { createSeededRng } from '../model/random';
 import { playGame } from './arena';
 
-export type FitnessResult = { meanMargin: number; winRate: number; games: number }
+// `points`: the candidate's own final points in every game, for tail statistics.
+export type FitnessResult = { meanMargin: number; winRate: number; games: number; points: number[] }
 
 
 export function evaluateWeights(
@@ -16,6 +17,7 @@ export function evaluateWeights(
     const games = opts.seeds.length * 2
     var meanMargin = 0
     var wins = 0
+    const points: number[] = []
 
     for (const seed of opts.seeds) {
         const reference = opts.reference(0, seed);
@@ -27,6 +29,7 @@ export function evaluateWeights(
         })
         const margin = result.points[1] - result.points[0]
         meanMargin += margin
+        points.push(result.points[1])
         if (margin > 0) {
             wins++
         }
@@ -42,10 +45,11 @@ export function evaluateWeights(
         })
         const margin = result.points[0] - result.points[1]
         meanMargin += margin
+        points.push(result.points[0])
         if (margin > 0) {
             wins++
         }
     }
 
-    return { meanMargin: meanMargin / games, winRate: wins / games, games: games }
+    return { meanMargin: meanMargin / games, winRate: wins / games, games: games, points: points }
 }

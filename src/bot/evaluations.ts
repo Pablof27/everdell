@@ -32,6 +32,9 @@ export function handTunedWeights(): Weights {
         0.75,  // cityGovernanceCards
         0.2,  // freeDestinations
         0.4,  // freeCitySpaces
+        0,    // affordableHandCards
+        0,    // usefulResources
+        0,    // excessResources
         -1   // bestOponentsPoints
     ]
     return SEASONS.map(() => row.slice())
@@ -55,12 +58,18 @@ export function weightsToJSON(w: Weights): {featureNames: string[]; seasons: Sea
     }
 }
 
+// Matches columns by feature name. Features missing from the file get weight 0, so weights saved
+// before a feature existed play exactly as they did (warm start for a new evolution run).
 export function weightsFromJSON(json: {featureNames: string[]; seasons: Season[]; weights: Weights}): Weights {
-    if (JSON.stringify(json.featureNames) !== JSON.stringify(FEATURE_NAMES)) {
-        throw new Error(`Weights were saved for features [${json.featureNames}], expected [${FEATURE_NAMES}]`)
+    const unknown = json.featureNames.filter(name => !FEATURE_NAMES.includes(name))
+    if (unknown.length > 0) {
+        throw new Error(`Weights were saved for features [${json.featureNames}]; [${unknown}] no longer exist`)
     }
     if (JSON.stringify(json.seasons) !== JSON.stringify(SEASONS)) {
         throw new Error(`Weights were saved for seasons [${json.seasons}], expected [${SEASONS}]`)
     }
-    return json.weights
+    return json.weights.map(row => FEATURE_NAMES.map(name => {
+        const idx = json.featureNames.indexOf(name)
+        return idx === -1 ? 0 : row[idx]
+    }))
 }

@@ -38,6 +38,7 @@ process.on("message", (job: WorkerJob) => {
         meanMargin: parts.reduce((s, p) => s + p.meanMargin * p.games, 0) / games,
         winRate: parts.reduce((s, p) => s + p.winRate * p.games, 0) / games,
         games,
+        points: parts.flatMap((p) => p.points),
       },
     };
   } catch (err) {
