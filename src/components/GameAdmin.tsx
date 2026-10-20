@@ -37,6 +37,9 @@ const GameAdmin = ({
         <div className={styles.footer}>
           <i>
             Game ID: {gameJSON.gameId}
+            {gameJSON.seed != null && (
+              <>&nbsp;&middot;&nbsp;Seed: {gameJSON.seed}</>
+            )}
             &nbsp;&middot;&nbsp;
             <a target="_blank" href={`/game/${gameJSON.gameId}`}>
               spectator link

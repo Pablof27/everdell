@@ -1,6 +1,6 @@
 import expect from "expect.js";
 import { GameState } from "../model/gameState";
-import { Game } from "../model/game";
+import { Game, createGame } from "../model/game";
 import { Card } from "../model/card";
 import { createPlayer } from "../model/player";
 import { testInitialGameState } from "../model/testHelpers";
@@ -27,6 +27,9 @@ import { getLegalMoves, legalMovesInternals } from "./legalMoves";
 import { playGame, runArena } from "./arena";
 import { determinize } from "./determinize";
 import { playBotTurns } from "./botRunner";
+import { handTunedWeights } from "./evaluations";
+import { BOT_DIFFICULTIES } from "./difficulties";
+import { listWeightsFiles, resolveBotChoice } from "./botCatalog";
 
 const NEWLEAF_OPTIONS: Partial<GameOptions> = {
   newleaf: {
@@ -425,5 +428,101 @@ describe("botRunner", () => {
 
   it("createBot rejects unknown bot types", () => {
     expect(() => createBot("NOPE" as any)).to.throwException();
+  });
+});
+
+describe("seeded games", () => {
+  // Player ids and secrets stay random in seeded games.
+  const normalize = (gameState: GameState) => {
+    let json = JSON.stringify(
+      gameState.toJSON({ includePrivate: true, isRoot: true })
+    );
+    gameState.players.forEach((p, idx) => {
+      json = json
+        .split(p.playerId)
+        .join(`player${idx}`)
+        .split(p.playerSecretUNSAFE)
+        .join(`secret${idx}`);
+    });
+    return json;
+  };
+
+  it("deals the same setup as the arena for the same seed", async () => {
+    const gameOptions = { pearlbrook: true };
+    const players = [{ name: "A" }, { name: "B" }];
+    const game = await createGame(players, gameOptions, { seed: 123 });
+    const arenaSetup = withRng(createSeededRng(123), () =>
+      GameState.initialGameState({
+        players: players.map(({ name }) => createPlayer(name)),
+        gameOptions,
+      })
+    );
+    expect(normalize(game.getGameState())).to.be(normalize(arenaSetup));
+
+    const other = await createGame(players, gameOptions, { seed: 124 });
+    expect(normalize(other.getGameState())).to.not.be(normalize(arenaSetup));
+
+    expect(game.toJSON(true).seed).to.be(123);
+    expect(game.toJSON(false).seed).to.be(undefined);
+  });
+
+  it("replays the player order and every bot move", async function () {
+    this.timeout(30000);
+    const weights = handTunedWeights();
+    const play = async () => {
+      const game = await createGame(
+        [
+          { name: "Random", botType: "RANDOM" },
+          { name: "Greedy", botType: "GREEDY", botWeights: weights },
+        ],
+        {},
+        { seed: 2024, randomizePlayerOrder: true }
+      );
+      await playBotTurns(game);
+      return game;
+    };
+    const a = await play();
+    const b = await play();
+    expect(a.isGameOver()).to.be(true);
+    expect(normalize(a.getGameState())).to.be(normalize(b.getGameState()));
+
+    const greedy = a.getGameState().players.find((p) => p.name === "Greedy")!;
+    expect(Game.fromJSON(a.toJSON(true)).getBotWeights(greedy.playerId)).to.eql(
+      weights
+    );
+  });
+});
+
+describe("botCatalog", () => {
+  it("lists weights files, skipping evolve checkpoints", () => {
+    const files = listWeightsFiles();
+    expect(files.length > 0).to.be(true);
+    expect(files.some((file) => file.includes("checkpoints"))).to.be(false);
+  });
+
+  it("resolves every configured difficulty", () => {
+    BOT_DIFFICULTIES.forEach(({ name, botType, weightsFile }) => {
+      const bot = resolveBotChoice({ difficulty: name });
+      expect(bot.botType).to.be(botType);
+      expect(!!bot.botWeights).to.be(!!weightsFile);
+    });
+  });
+
+  it("rejects unknown difficulties, strategies and weights files", () => {
+    expect(() =>
+      resolveBotChoice({ difficulty: "Impossible" })
+    ).to.throwException();
+    expect(() =>
+      resolveBotChoice({ botType: "NOPE" as any })
+    ).to.throwException();
+    expect(() =>
+      resolveBotChoice({ botType: "GREEDY", weightsFile: "../package.json" })
+    ).to.throwException();
+    expect(() =>
+      resolveBotChoice({
+        botType: "GREEDY",
+        weightsFile: "run1/checkpoints/gen-001.json",
+      })
+    ).to.throwException();
   });
 });

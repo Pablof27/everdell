@@ -1,19 +1,21 @@
 import * as React from "react";
 import { useState } from "react";
+import type { GetServerSideProps } from "next";
 import Head from "next/head";
 import Link from "next/link";
 import styles from "../styles/Home.module.css";
 
 import GameBuilder from "../components/GameBuilder";
+import { BotOptions, getBotOptions } from "../bot/botCatalog";
 
-const Main: React.FC = () => {
+const Main: React.FC<{ botOptions: BotOptions }> = ({ botOptions }) => {
   const [showGameBuilder, setShowGameBuilder] = useState(false);
   return (
     <div>
       <h1 className={styles.title}>Everdell</h1>
       {showGameBuilder ? (
         <div className={styles.game_builder_wrapper}>
-          <GameBuilder />
+          <GameBuilder botOptions={botOptions} />
         </div>
       ) : (
         <div className={styles.links}>
@@ -61,7 +63,11 @@ const Main: React.FC = () => {
   );
 };
 
-export default function IndexPage() {
+export const getServerSideProps: GetServerSideProps = async () => ({
+  props: { botOptions: getBotOptions() },
+});
+
+export default function IndexPage({ botOptions }: { botOptions: BotOptions }) {
   return (
     <div className={styles.container}>
       <Head>
@@ -71,7 +77,7 @@ export default function IndexPage() {
             color: #2b2c1a;`}
         </style>
       </Head>
-      <Main />
+      <Main botOptions={botOptions} />
     </div>
   );
 }

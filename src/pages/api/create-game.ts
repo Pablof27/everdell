@@ -1,7 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import shuffle from "lodash/shuffle";
-import { createGame } from "../../model/game";
+import { createGame, NewGamePlayer } from "../../model/game";
+import { MAX_SEED } from "../../model/random";
 import { playBotTurns } from "../../bot/botRunner";
+import { resolveBotChoice } from "../../bot/botCatalog";
 
 export default async (
   req: NextApiRequest,
@@ -29,16 +30,37 @@ export default async (
     });
     return;
   }
-  if (body.players.every((p: any) => !!p.isBot)) {
+  if (body.players.every((p: any) => !!p.bot)) {
     res.status(400).json({
       success: false,
       error: "At least one player must be human",
     });
     return;
   }
-  const players = body.randomizeStartingPlayer
-    ? shuffle([...body.players])
-    : [...body.players];
+  const seedInput = String(body.seed ?? "").trim();
+  if (
+    seedInput &&
+    !(/^\d+$/.test(seedInput) && Number(seedInput) <= MAX_SEED)
+  ) {
+    res.status(400).json({
+      success: false,
+      error: `Seed must be a whole number from 0 to ${MAX_SEED}`,
+    });
+    return;
+  }
+  let players: NewGamePlayer[];
+  try {
+    players = body.players.map((p: any) => ({
+      name: p.name,
+      ...(p.bot ? resolveBotChoice(p.bot) : {}),
+    }));
+  } catch (e) {
+    res.status(400).json({
+      success: false,
+      error: (e as Error).message,
+    });
+    return;
+  }
   const realtimePoints = !!body.realtimePoints;
   const allowUndo = !!body.allowUndo;
   const chooseStartingResources = !!body.chooseStartingResources;
@@ -60,10 +82,7 @@ export default async (
     ? { forestLocations: true, specialEvents: true, basicEvents: true }
     : {};
   const game = await createGame(
-    players.map((p: any) => ({
-      name: p.name,
-      botType: p.isBot ? ("RANDOM" as const) : null,
-    })),
+    players,
     {
       allowUndo,
       chooseStartingResources,
@@ -71,6 +90,10 @@ export default async (
       pearlbrook,
       newleaf,
       bellfaire,
+    },
+    {
+      seed: seedInput ? Number(seedInput) : undefined,
+      randomizePlayerOrder: !!body.randomizeStartingPlayer,
     }
   );
   // A bot may have been picked as the starting player.

@@ -1,37 +1,85 @@
 import * as React from "react";
 import { useRouter } from "next/router";
 import { Formik, Form, Field, FieldArray } from "formik";
+import type { BotChoice, BotOptions } from "../bot/botCatalog";
+import { BOT_TYPES, BotType } from "../model/types";
 import styles from "../styles/Home.module.css";
 
+// Values of the per-player select other than the difficulty names.
+const HUMAN = "";
+const CUSTOM_BOT = "custom";
+
+const BOT_TYPE_LABELS: Record<BotType, string> = {
+  RANDOM: "Random",
+  GREEDY: "Greedy",
+};
+
+type PlayerValues = {
+  name: string;
+  bot: string;
+  botType: BotType;
+  // "" = hand-tuned weights.
+  weightsFile: string;
+};
+
 let playerIdx = 0;
-const getDummyPlayer = (name = "") => {
+const getDummyPlayer = (weightsFiles: string[], name = ""): PlayerValues => {
   playerIdx++;
   return {
     name: name || `Player ${playerIdx}`,
-    isBot: false,
+    bot: HUMAN,
+    botType: "GREEDY",
+    weightsFile: weightsFiles[weightsFiles.length - 1] || "",
   };
 };
 
-const GameBuilder: React.FC = () => {
+const toBotChoice = ({
+  bot,
+  botType,
+  weightsFile,
+}: PlayerValues): BotChoice | null => {
+  if (bot === HUMAN) {
+    return null;
+  }
+  if (bot === CUSTOM_BOT) {
+    return botType === "GREEDY" && weightsFile
+      ? { botType, weightsFile }
+      : { botType };
+  }
+  return { difficulty: bot };
+};
+
+const GameBuilder: React.FC<{ botOptions: BotOptions }> = ({ botOptions }) => {
   const router = useRouter();
+  const { difficulties, weightsFiles } = botOptions;
   return (
     <div id={"js-game-builder"}>
       <Formik
         initialValues={{
-          players: [getDummyPlayer("Player 1"), getDummyPlayer("Player 2")],
+          players: [
+            getDummyPlayer(weightsFiles, "Player 1"),
+            getDummyPlayer(weightsFiles, "Player 2"),
+          ],
           randomizeStartingPlayer: true,
           chooseStartingResources: true,
           realtimePoints: true,
           pearlbrook: false,
+          seed: "",
         }}
-        onSubmit={async (values, actions) => {
+        onSubmit={async ({ players, ...options }, actions) => {
           const response = await fetch("/api/create-game", {
             method: "POST",
             cache: "no-cache",
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify(values),
+            body: JSON.stringify({
+              ...options,
+              players: players.map((p) => ({
+                name: p.name,
+                bot: toBotChoice(p),
+              })),
+            }),
           });
           const json = await response.json();
           if (json.success && json.gameUrl) {
@@ -57,59 +105,97 @@ const GameBuilder: React.FC = () => {
                         <h3>Players</h3>
                         {numPlayers > 0 ? (
                           players.map((player, idx) => (
-                            <div
-                              key={idx}
-                              className={
-                                styles.game_builder_player_input_wrapper
-                              }
-                            >
-                              <Field
-                                name={`players.${idx}.name`}
-                                placeholder="Player Name"
-                                onClick={(e: any) => {
-                                  e.target.select();
-                                }}
-                              />
-                              <label
-                                className={styles.game_builder_player_bot}
-                                title="Played by the computer"
+                            <div key={idx}>
+                              <div
+                                className={
+                                  styles.game_builder_player_input_wrapper
+                                }
                               >
                                 <Field
-                                  type="checkbox"
-                                  name={`players.${idx}.isBot`}
+                                  name={`players.${idx}.name`}
+                                  placeholder="Player Name"
+                                  onClick={(e: any) => {
+                                    e.target.select();
+                                  }}
                                 />
-                                {"Bot"}
-                              </label>
-                              {numPlayers > 2 && (
-                                <button
-                                  type="button"
-                                  tabIndex={-1}
-                                  className={
-                                    styles.game_builder_player_input_button
-                                  }
-                                  onClick={() => arrayHelpers.remove(idx)}
+                                <Field
+                                  as="select"
+                                  name={`players.${idx}.bot`}
+                                  className={styles.game_builder_select}
+                                  title="Who plays this seat"
                                 >
-                                  {" "}
-                                  -{" "}
-                                </button>
-                              )}
-                              {numPlayers < 4 && (
-                                <button
-                                  type="button"
-                                  tabIndex={-1}
-                                  className={[
-                                    styles.game_builder_player_input_button,
-                                    styles.game_builder_player_input_button_plus,
-                                  ].join(" ")}
-                                  onClick={() =>
-                                    arrayHelpers.insert(
-                                      idx + 1,
-                                      getDummyPlayer()
-                                    )
-                                  }
-                                >
-                                  +
-                                </button>
+                                  <option value={HUMAN}>Human</option>
+                                  {difficulties.map((name) => (
+                                    <option key={name} value={name}>
+                                      {`${name} bot`}
+                                    </option>
+                                  ))}
+                                  <option value={CUSTOM_BOT}>Custom bot</option>
+                                </Field>
+                                {numPlayers > 2 && (
+                                  <button
+                                    type="button"
+                                    tabIndex={-1}
+                                    className={
+                                      styles.game_builder_player_input_button
+                                    }
+                                    onClick={() => arrayHelpers.remove(idx)}
+                                  >
+                                    {" "}
+                                    -{" "}
+                                  </button>
+                                )}
+                                {numPlayers < 4 && (
+                                  <button
+                                    type="button"
+                                    tabIndex={-1}
+                                    className={[
+                                      styles.game_builder_player_input_button,
+                                      styles.game_builder_player_input_button_plus,
+                                    ].join(" ")}
+                                    onClick={() =>
+                                      arrayHelpers.insert(
+                                        idx + 1,
+                                        getDummyPlayer(weightsFiles)
+                                      )
+                                    }
+                                  >
+                                    +
+                                  </button>
+                                )}
+                              </div>
+                              {player.bot === CUSTOM_BOT && (
+                                <div className={styles.game_builder_custom_bot}>
+                                  <Field
+                                    as="select"
+                                    name={`players.${idx}.botType`}
+                                    className={styles.game_builder_select}
+                                    title="Strategy"
+                                  >
+                                    {BOT_TYPES.map((type) => (
+                                      <option key={type} value={type}>
+                                        {BOT_TYPE_LABELS[type]}
+                                      </option>
+                                    ))}
+                                  </Field>
+                                  {player.botType === "GREEDY" && (
+                                    <Field
+                                      as="select"
+                                      name={`players.${idx}.weightsFile`}
+                                      className={styles.game_builder_select}
+                                      title="Weights file (under weights/)"
+                                    >
+                                      {weightsFiles.map((file) => (
+                                        <option key={file} value={file}>
+                                          {file}
+                                        </option>
+                                      ))}
+                                      <option value="">
+                                        Hand-tuned weights
+                                      </option>
+                                    </Field>
+                                  )}
+                                </div>
                               )}
                             </div>
                           ))
@@ -160,6 +246,18 @@ const GameBuilder: React.FC = () => {
                             {"Allow undo"}
                             &nbsp;
                             <span className={styles.beta}>beta</span>
+                          </label>
+                          <label
+                            className={styles.game_builder_option}
+                            title="The same seed and setup replay the same game"
+                          >
+                            {"Seed"}
+                            <Field
+                              name="seed"
+                              placeholder="Random"
+                              inputMode="numeric"
+                              className={styles.game_builder_seed}
+                            />
                           </label>
                         </div>
                       </div>

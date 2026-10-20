@@ -25,6 +25,9 @@ export type GameJSON = {
   gameId: string;
   gameSecret: string;
   gameState: GameStateJSON;
+  // Private; absent in games created before they existed.
+  seed?: number | null;
+  botWeights?: Record<string, number[][]>;
 };
 
 export type GameStateJSON = {

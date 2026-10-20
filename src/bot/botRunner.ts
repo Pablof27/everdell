@@ -22,7 +22,8 @@ export async function playBotTurns(game: Game): Promise<number> {
     let numMoves = 0;
     while (!game.isGameOver()) {
       const player = game.getActivePlayer();
-      if (!player.botType) {
+      const botType = player.botType;
+      if (!botType) {
         break;
       }
       if (numMoves >= MAX_BOT_MOVES_PER_CALL) {
@@ -30,28 +31,33 @@ export async function playBotTurns(game: Game): Promise<number> {
           `Bot ${player.name} exceeded ${MAX_BOT_MOVES_PER_CALL} moves`
         );
       }
-      const bot = createBot(player.botType);
       const gameState = game.getGameState();
-      let legalMoves = getLegalMoves(gameState);
-      if (legalMoves.length === 0) {
-        throw new Error(`No legal moves for bot ${player.name}`);
-      }
-      for (;;) {
-        const move = bot.chooseMove(gameState, legalMoves);
-        try {
-          game.applyGameInput(move);
-          break;
-        } catch (err) {
-          console.warn(
-            `Bot move rejected (${(err as Error).message.split("\n")[0]}): ` +
-              JSON.stringify(move)
-          );
-          legalMoves = legalMoves.filter((m) => m !== move);
-          if (legalMoves.length === 0) {
-            throw err;
+      game.withGameRng("bot", (rng) => {
+        const bot = createBot(botType, {
+          rng,
+          weights: game.getBotWeights(player.playerId),
+        });
+        let legalMoves = getLegalMoves(gameState, { rng });
+        if (legalMoves.length === 0) {
+          throw new Error(`No legal moves for bot ${player.name}`);
+        }
+        for (;;) {
+          const move = bot.chooseMove(gameState, legalMoves);
+          try {
+            game.applyGameInput(move);
+            break;
+          } catch (err) {
+            console.warn(
+              `Bot move rejected (${(err as Error).message.split("\n")[0]}): ` +
+                JSON.stringify(move)
+            );
+            legalMoves = legalMoves.filter((m) => m !== move);
+            if (legalMoves.length === 0) {
+              throw err;
+            }
           }
         }
-      }
+      });
       await game.save();
       numMoves++;
     }

@@ -54,7 +54,7 @@
 
 .game_builder {
   display: flex;
-  width: 350px;
+  width: 420px;
   margin: 0 auto;
   flex-direction: column;
   border: solid 1px;
@@ -92,7 +92,8 @@
 .game_builder_player_input_wrapper input {
   padding: 5px;
   font-size: 18px;
-  width: 240px;
+  flex: 1;
+  min-width: 0;
   background-color: inherit;
   color: inherit;
   outline: none;
@@ -108,27 +109,50 @@
   font-size: 18px;
 }
 
-.game_builder_player_bot {
-  display: flex;
-  align-items: center;
-  padding-left: 10px;
+.game_builder_select {
+  margin-left: 8px;
+  padding: 5px;
   font-size: 16px;
+  font-family: inherit;
+  background-color: inherit;
+  color: inherit;
+  border: solid 1px;
+  border-radius: 5px;
 }
 
-.game_builder_player_bot input {
-  width: auto;
-  margin-right: 5px;
+.game_builder_custom_bot {
+  display: flex;
+  padding: 0 5px 5px 20px;
+}
+
+.game_builder_custom_bot select:last-child {
+  flex: 1;
+  min-width: 0;
 }
 
 .game_builder_option {
   padding: 5px;
   display: flex;
+  align-items: center;
   justify-content: left;
   font-size: 16px;
 }
 
 .game_builder_option input {
   margin-right: 5px;
+}
+
+.game_builder_seed {
+  margin-left: 8px;
+  padding: 3px 5px;
+  width: 140px;
+  font-size: 16px;
+  font-family: inherit;
+  background-color: inherit;
+  color: inherit;
+  outline: none;
+  border: solid 1px;
+  border-radius: 5px;
 }
 
 .beta {

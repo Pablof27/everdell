@@ -14,6 +14,24 @@ export function createSeededRng(seed: number): Rng {
   };
 }
 
+export const MAX_SEED = 0xffffffff;
+
+// MurmurHash3's 32-bit finalizer.
+function mix32(h: number): number {
+  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+  return (h ^ (h >>> 16)) >>> 0;
+}
+
+// Hashes a seed with salts into a new seed, so streams derived with different
+// salts are unrelated to each other and to the stream of `seed` itself.
+export function deriveSeed(seed: number, ...salts: number[]): number {
+  return salts.reduce(
+    (h, salt) => mix32(h ^ mix32(salt + 0x9e3779b9)),
+    seed >>> 0
+  );
+}
+
 let currentRng: Rng = Math.random;
 
 export function setRng(rng: Rng | null): void {
@@ -26,6 +44,10 @@ export function seedRng(seed: number): void {
 
 export function random(): number {
   return currentRng();
+}
+
+export function randomSeed(): number {
+  return Math.floor(random() * (MAX_SEED + 1));
 }
 
 export function randomInt(maxExclusive: number, rng: Rng = currentRng): number {
