@@ -17,10 +17,31 @@ export type BotOptions = {
   weightsFiles: string[];
 };
 
+export type ResolvedBot = { botType: BotType; botWeights: Weights | null };
+
+// The arena page builds its bots in the browser, so it gets them resolved.
+export type ArenaBotOptions = {
+  difficulties: { name: string; bot: ResolvedBot }[];
+  weightsFiles: { file: string; weights: Weights }[];
+};
+
 export function getBotOptions(): BotOptions {
   return {
     difficulties: BOT_DIFFICULTIES.map((d) => d.name),
     weightsFiles: listWeightsFiles(),
+  };
+}
+
+export function getArenaBotOptions(): ArenaBotOptions {
+  return {
+    difficulties: BOT_DIFFICULTIES.map(({ name }) => ({
+      name,
+      bot: resolveBotChoice({ difficulty: name }),
+    })),
+    weightsFiles: listWeightsFiles().map((file) => ({
+      file,
+      weights: readWeights(file) as Weights,
+    })),
   };
 }
 
@@ -57,9 +78,7 @@ function readWeights(file: string): Weights | null {
 }
 
 // Only listed weights files are read, so client input can't reach other paths.
-export function resolveBotChoice(
-  choice: BotChoice
-): { botType: BotType; botWeights: Weights | null } {
+export function resolveBotChoice(choice: BotChoice): ResolvedBot {
   if ("difficulty" in choice) {
     const { difficulty } = choice;
     const config = BOT_DIFFICULTIES.find((d) => d.name === difficulty);

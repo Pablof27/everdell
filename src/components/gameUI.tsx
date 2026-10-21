@@ -65,15 +65,18 @@ export const GameUIContext = React.createContext<GameUIContextValue>({
 export const GameUIProvider: React.FC<{
   gameState: GameState;
   viewingPlayerId: string | null;
-}> = ({ gameState, viewingPlayerId, children }) => {
+  // Theme of each player (by seat); defaults to the seat index.
+  playerThemeIdxs?: number[];
+}> = ({ gameState, viewingPlayerId, playerThemeIdxs, children }) => {
   const value = React.useMemo<GameUIContextValue>(() => {
     const idxById: Record<string, number> = {};
     const idxByName: Record<string, number> = {};
     const nameById: Record<string, string> = {};
     const numWorkersById: Record<string, number> = {};
     gameState.players.forEach((player, idx) => {
-      idxById[player.playerId] = idx;
-      idxByName[player.name] = idx;
+      const themeIdx = playerThemeIdxs ? playerThemeIdxs[idx] : idx;
+      idxById[player.playerId] = themeIdx;
+      idxByName[player.name] = themeIdx;
       nameById[player.playerId] = player.name;
       numWorkersById[player.playerId] = player.toJSON(false).numWorkers;
     });
@@ -87,7 +90,7 @@ export const GameUIProvider: React.FC<{
       getPlayerName: (playerId: string) => nameById[playerId] || playerId,
       getNumWorkers: (playerId: string) => numWorkersById[playerId] || 0,
     };
-  }, [gameState, viewingPlayerId]);
+  }, [gameState, viewingPlayerId, playerThemeIdxs]);
   return (
     <GameUIContext.Provider value={value}>{children}</GameUIContext.Provider>
   );

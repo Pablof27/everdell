@@ -36,6 +36,9 @@ const Main: React.FC<{ botOptions: BotOptions }> = ({ botOptions }) => {
           <Link href="/test/ui" className={styles.link}>
             Game Cards
           </Link>
+          <Link href="/arena" className={styles.link}>
+            Bot Arena
+          </Link>
           <a
             target="_blank"
             href="https://github.com/ymichael/everdell"

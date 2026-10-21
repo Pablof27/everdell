@@ -4,11 +4,11 @@
 //                    [--pearlbrook] [--newleaf] [--bellfaire] [--verbose]
 //
 // A GREEDY bot can load weights: --bots=GREEDY:weights/run1/greedy-evolved.json,GREEDY
+//
+// The arena page (/arena) runs the same arenas in the browser.
 import fs from "fs";
-import { BotType, GameOptions } from "../model/types";
-import { createSeededRng } from "../model/random";
-import { createBot } from "./bot";
-import { runArena } from "./arena";
+import { BotType } from "../model/types";
+import { arenaGameOptions, createArenaBots, runArena } from "./arena";
 import { weightsFromJSON } from "./evaluations";
 
 function parseArgs(argv: string[]): Record<string, string | boolean> {
@@ -34,38 +34,20 @@ function main(): void {
     });
   const verbose = !!args.verbose;
 
-  const gameOptions: Partial<GameOptions> = {};
-  if (args.pearlbrook) {
-    gameOptions.pearlbrook = true;
-  }
-  if (args.newleaf) {
-    gameOptions.newleaf = {
-      cards: true,
-      forestLocations: true,
-      basicEvents: true,
-      specialEvents: true,
-      station: true,
-      ticket: true,
-      knoll: true,
-      reserving: true,
-      visitors: true,
-    };
-  }
-  if (args.bellfaire) {
-    gameOptions.bellfaire = {
-      forestLocations: true,
-      specialEvents: true,
-      basicEvents: true,
-    };
-  }
+  const gameOptions = arenaGameOptions({
+    pearlbrook: !!args.pearlbrook,
+    newleaf: !!args.newleaf,
+    bellfaire: !!args.bellfaire,
+  });
 
-  const bots = botSpecs.map(({ botType, weightsFile }, idx) =>
-    createBot(botType, {
-      rng: createSeededRng(seed * 1000 + idx),
+  const bots = createArenaBots(
+    botSpecs.map(({ botType, weightsFile }) => ({
+      botType,
       weights: weightsFile
         ? weightsFromJSON(JSON.parse(fs.readFileSync(weightsFile, "utf8")))
-        : undefined,
-    })
+        : null,
+    })),
+    seed
   );
   const names = bots.map((bot, idx) => `${bot.name}#${idx + 1}`);
 

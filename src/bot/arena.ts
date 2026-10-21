@@ -1,8 +1,9 @@
-import { GameState } from "../model/gameState";
+import { GameState, withGameLogListener } from "../model/gameState";
 import { Player } from "../model/player";
-import { GameInput, GameOptions } from "../model/types";
+import { BotType, GameInput, GameLogEntry, GameOptions } from "../model/types";
 import { createSeededRng, withRng } from "../model/random";
-import { Bot } from "./bot";
+import { Bot, createBot } from "./bot";
+import { Weights } from "./evaluations";
 import { getLegalMoves } from "./legalMoves";
 
 export type GameResult = {
@@ -15,6 +16,8 @@ export type GameResult = {
   numRejectedMoves: number;
   durationMs: number;
   finalState: GameState;
+  // With recordLog: the whole log (finalState only keeps the latest entries).
+  log?: GameLogEntry[];
 };
 
 export type PlayGameOptions = {
@@ -22,6 +25,7 @@ export type PlayGameOptions = {
   seed: number;
   gameOptions?: Partial<GameOptions>;
   maxMoves?: number;
+  recordLog?: boolean;
   onRejectedMove?: (
     gameState: GameState,
     move: GameInput,
@@ -38,9 +42,21 @@ export function playGame({
   seed,
   gameOptions = {},
   maxMoves = 5000,
+  recordLog = false,
   onRejectedMove,
 }: PlayGameOptions): GameResult {
   const start = Date.now();
+  const log: GameLogEntry[] = [];
+  // Runs fn, keeping the log entries it adds unless it throws (rejected move).
+  const logged = <T>(fn: () => T): T => {
+    if (!recordLog) {
+      return fn();
+    }
+    const entries: GameLogEntry[] = [];
+    const ret = withGameLogListener((logEntry) => entries.push(logEntry), fn);
+    log.push(...entries);
+    return ret;
+  };
   return withRng(createSeededRng(seed), () => {
     const players = bots.map(
       (bot, idx) =>
@@ -50,14 +66,16 @@ export function playGame({
           playerSecret: `seat-${idx}`,
         })
     );
-    let gameState = GameState.initialGameState({
-      players,
-      gameOptions: {
-        realtimePoints: false,
-        ...gameOptions,
-        allowUndo: false,
-      },
-    });
+    let gameState = logged(() =>
+      GameState.initialGameState({
+        players,
+        gameOptions: {
+          realtimePoints: false,
+          ...gameOptions,
+          allowUndo: false,
+        },
+      })
+    );
     const seatByPlayerId: Record<string, number> = {};
     players.forEach((p, idx) => (seatByPlayerId[p.playerId] = idx));
 
@@ -78,7 +96,9 @@ export function playGame({
       for (;;) {
         const move = bot.chooseMove(gameState, legalMoves);
         try {
-          gameState = gameState.next(move, true, true /* skipUndo */);
+          gameState = logged(() =>
+            gameState.next(move, true, true /* skipUndo */)
+          );
           break;
         } catch (err) {
           numRejectedMoves++;
@@ -107,6 +127,7 @@ export function playGame({
       numRejectedMoves,
       durationMs: Date.now() - start,
       finalState: gameState,
+      log: recordLog ? log : undefined,
     };
   });
 }
@@ -116,7 +137,13 @@ export type ArenaOptions = {
   numGames: number;
   seed?: number;
   gameOptions?: Partial<GameOptions>;
-  onGameEnd?: (result: GameResult, gameIdx: number) => void;
+  recordLog?: boolean;
+  // botBySeat[seat] is the index in `bots` of the bot playing that seat.
+  onGameEnd?: (
+    result: GameResult,
+    gameIdx: number,
+    botBySeat: number[]
+  ) => void;
   onRejectedMove?: PlayGameOptions["onRejectedMove"];
 };
 
@@ -139,6 +166,7 @@ export function runArena({
   numGames,
   seed = 1,
   gameOptions,
+  recordLog,
   onGameEnd,
   onRejectedMove,
 }: ArenaOptions): ArenaSummary {
@@ -151,22 +179,23 @@ export function runArena({
   for (let gameIdx = 0; gameIdx < numGames; gameIdx++) {
     const offset = gameIdx % bots.length;
     // seat s is played by bot (s + offset) % n
-    const seating = bots.map((_, seat) => bots[(seat + offset) % bots.length]);
+    const botBySeat = bots.map((_, seat) => (seat + offset) % bots.length);
     const result = playGame({
-      bots: seating,
+      bots: botBySeat.map((botIdx) => bots[botIdx]),
       seed: seed + gameIdx,
       gameOptions,
+      recordLog,
       onRejectedMove,
     });
     result.points.forEach((pts, seat) => {
-      totalPoints[(seat + offset) % bots.length] += pts;
+      totalPoints[botBySeat[seat]] += pts;
     });
     result.winnerSeats.forEach((seat) => {
-      wins[(seat + offset) % bots.length] += 1 / result.winnerSeats.length;
+      wins[botBySeat[seat]] += 1 / result.winnerSeats.length;
     });
     totalMoves += result.numMoves;
     numRejectedMoves += result.numRejectedMoves;
-    onGameEnd?.(result, gameIdx);
+    onGameEnd?.(result, gameIdx, botBySeat);
   }
 
   return {
@@ -177,4 +206,62 @@ export function runArena({
     numRejectedMoves,
     durationMs: Date.now() - start,
   };
+}
+
+export type ArenaBotSpec = {
+  botType: BotType;
+  // GREEDY evaluation weights (default: hand-tuned).
+  weights?: Weights | null;
+  name?: string;
+};
+
+// Bot i's rng is seeded from (seed, i), so the same specs and seed replay the
+// same arena in the CLI and in the arena page.
+export function createArenaBots(specs: ArenaBotSpec[], seed: number): Bot[] {
+  return specs.map(({ botType, weights, name }, idx) =>
+    createBot(botType, {
+      name,
+      rng: createSeededRng(seed * 1000 + idx),
+      weights: weights || undefined,
+    })
+  );
+}
+
+export type ArenaExpansions = {
+  pearlbrook?: boolean;
+  newleaf?: boolean;
+  bellfaire?: boolean;
+};
+
+// Game options with every module of the chosen expansions.
+export function arenaGameOptions({
+  pearlbrook,
+  newleaf,
+  bellfaire,
+}: ArenaExpansions): Partial<GameOptions> {
+  const gameOptions: Partial<GameOptions> = {};
+  if (pearlbrook) {
+    gameOptions.pearlbrook = true;
+  }
+  if (newleaf) {
+    gameOptions.newleaf = {
+      cards: true,
+      forestLocations: true,
+      basicEvents: true,
+      specialEvents: true,
+      station: true,
+      ticket: true,
+      knoll: true,
+      reserving: true,
+      visitors: true,
+    };
+  }
+  if (bellfaire) {
+    gameOptions.bellfaire = {
+      forestLocations: true,
+      specialEvents: true,
+      basicEvents: true,
+    };
+  }
+  return gameOptions;
 }

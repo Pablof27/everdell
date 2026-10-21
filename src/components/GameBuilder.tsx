@@ -9,7 +9,7 @@ import styles from "../styles/Home.module.css";
 const HUMAN = "";
 const CUSTOM_BOT = "custom";
 
-const BOT_TYPE_LABELS: Record<BotType, string> = {
+export const BOT_TYPE_LABELS: Record<BotType, string> = {
   RANDOM: "Random",
   GREEDY: "Greedy",
 };

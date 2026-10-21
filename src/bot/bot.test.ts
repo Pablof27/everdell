@@ -1,5 +1,5 @@
 import expect from "expect.js";
-import { GameState } from "../model/gameState";
+import { GameState, gameTextToDebugStr } from "../model/gameState";
 import { Game, createGame } from "../model/game";
 import { Card } from "../model/card";
 import { createPlayer } from "../model/player";
@@ -333,6 +333,46 @@ describe("arena", () => {
     expect(a.points).to.eql(b.points);
     expect(a.numMoves).to.be(b.numMoves);
     expect(a.winnerSeats.length >= 1).to.be(true);
+  });
+
+  it("records the whole game log on request", () => {
+    const play = (recordLog: boolean) =>
+      playGame({
+        bots: [1, 2, 3].map((i) => new RandomBot({ rng: createSeededRng(i) })),
+        seed: 7,
+        recordLog,
+      });
+    const { log = [], finalState } = play(true);
+    // The game state only keeps the latest entries.
+    const latest = finalState.getGameLog();
+    expect(log.length > latest.length).to.be(true);
+    expect(log.slice(-latest.length)).to.eql(latest);
+    expect(gameTextToDebugStr(log[0].entry)).to.be(
+      "Game created with 3 players."
+    );
+    expect(play(false).log).to.be(undefined);
+  });
+
+  it("reports which bot played each seat", () => {
+    const bots = [0, 1, 2].map(
+      (i) => new RandomBot({ name: `R${i}`, rng: createSeededRng(i) })
+    );
+    const seatings: number[][] = [];
+    runArena({
+      bots,
+      numGames: 3,
+      onGameEnd: ({ finalState }, gameIdx, botBySeat) => {
+        seatings.push(botBySeat);
+        expect(finalState.players.map((p) => p.name)).to.eql(
+          botBySeat.map((botIdx, seat) => `R${botIdx} (${seat + 1})`)
+        );
+      },
+    });
+    expect(seatings).to.eql([
+      [0, 1, 2],
+      [1, 2, 0],
+      [2, 0, 1],
+    ]);
   });
 
   it("random bots only generate moves the engine accepts (base game)", () => {

@@ -84,6 +84,23 @@ const MAX_GAME_LOG_BUFFER = 100;
 
 const PRINT_GAME_LOGS = false;
 
+let gameLogListener: ((logEntry: GameLogEntry) => void) | null = null;
+
+// Runs fn, passing listener every entry added to a game log meanwhile (game
+// logs only keep their latest MAX_GAME_LOG_BUFFER entries).
+export function withGameLogListener<T>(
+  listener: (logEntry: GameLogEntry) => void,
+  fn: () => T
+): T {
+  const prevListener = gameLogListener;
+  gameLogListener = listener;
+  try {
+    return fn();
+  } finally {
+    gameLogListener = prevListener;
+  }
+}
+
 const startingResourcesGameInput = (): GameInputMultiStep => ({
   inputType: GameInputType.SELECT_RESOURCES,
   prevInputType: GameInputType.SELECT_RESOURCES,
@@ -352,7 +369,9 @@ export class GameState {
       const debugStr = gameTextToDebugStr(entry);
       console.log(debugStr);
     }
-    this.gameLog.push({ entry });
+    const logEntry = { entry };
+    this.gameLog.push(logEntry);
+    gameLogListener?.(logEntry);
   }
 
   debugPrintLogs(): void {
