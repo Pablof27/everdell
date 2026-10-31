@@ -1,0 +1,108 @@
+{
+ "positions": 317639,
+ "games": 3000,
+ "files": 750,
+ "trainPositions": 301901,
+ "heldOutPositions": 15738,
+ "steps": 295,
+ "seconds": 2.938771963119507,
+ "args": {
+  "data": [
+   "data/az/run1"
+  ],
+  "encoding": null,
+  "window": 3000,
+  "out": "weights/az/run1/gen-003",
+  "init": "weights/az/run1/gen-002/model.json",
+  "hidden": "256,128",
+  "epochs": 1,
+  "batch": 1024,
+  "lr": 0.001,
+  "wd": 0.0001,
+  "margin_weight": 0.5,
+  "q_weight": 0.0,
+  "holdout": 0.05,
+  "seed": 4,
+  "device": "cpu",
+  "tag": "run1/gen-003",
+  "overfit": 0,
+  "steps": 200,
+  "random_init": false,
+  "export_fixture": null
+ },
+ "train": {
+  "policyCE": 1.7375435048136219,
+  "valueMSE": 0.504323398244792,
+  "marginHuber": 0.11379524371747313
+ },
+ "heldOutBefore": {
+  "policyCE": 1.8359656665775028,
+  "policyKL": 0.45831202289452105,
+  "valueMSE": 0.6566969706333794,
+  "valueSignAcc": 0.7423857868020305,
+  "endgameSignAcc": 0.8885611274991806,
+  "policyEntropy": 1.5690246805603252,
+  "calibration": [
+   {
+    "v": "[-1.0,-0.6)",
+    "meanZ": -0.6950934579439252,
+    "n": 3424
+   },
+   {
+    "v": "[-0.6,-0.2)",
+    "meanZ": -0.32649630127774043,
+    "n": 2974
+   },
+   {
+    "v": "[-0.2,0.2)",
+    "meanZ": 0.027244926327495134,
+    "n": 3597
+   },
+   {
+    "v": "[0.2,0.6)",
+    "meanZ": 0.3783545974483062,
+    "n": 2273
+   },
+   {
+    "v": "[0.6,1.0)",
+    "meanZ": 0.8014409221902017,
+    "n": 3470
+   }
+  ]
+ },
+ "heldOut": {
+  "policyCE": 1.757103747136095,
+  "policyKL": 0.37945004666565874,
+  "valueMSE": 0.7225818195311507,
+  "valueSignAcc": 0.7065188351589634,
+  "endgameSignAcc": 0.8675843985578499,
+  "policyEntropy": 1.762099135402358,
+  "calibration": [
+   {
+    "v": "[-1.0,-0.6)",
+    "meanZ": -0.6853341584158416,
+    "n": 3232
+   },
+   {
+    "v": "[-0.6,-0.2)",
+    "meanZ": -0.24847746650426308,
+    "n": 2463
+   },
+   {
+    "v": "[-0.2,0.2)",
+    "meanZ": -0.009310445155659005,
+    "n": 3437
+   },
+   {
+    "v": "[0.2,0.6)",
+    "meanZ": 0.18932564010097366,
+    "n": 2773
+   },
+   {
+    "v": "[0.6,1.0)",
+    "meanZ": 0.7101487085833551,
+    "n": 3833
+   }
+  ]
+ }
+}

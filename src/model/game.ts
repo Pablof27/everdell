@@ -1,7 +1,7 @@
 import { generate as uuid } from "short-uuid";
 import { Player, createPlayer } from "./player";
 import { GameState } from "./gameState";
-import { BotType, GameOptions, GameInput } from "./types";
+import { BotConfig, BotType, GameOptions, GameInput } from "./types";
 import { GameJSON } from "./jsonTypes";
 import { getGameJSONById, saveGameJSONById } from "./db";
 import {
@@ -27,6 +27,8 @@ export class Game {
   private seed: number | null;
   // Evaluation weights of GREEDY bots by playerId (missing: hand-tuned).
   private botWeights: Record<string, number[][]>;
+  // Model and search settings of MCTS_V / AZ bots by playerId.
+  private botConfigs: Record<string, BotConfig>;
 
   constructor({
     gameId,
@@ -35,6 +37,7 @@ export class Game {
     gameOptions = null,
     seed = null,
     botWeights = {},
+    botConfigs = {},
   }: {
     gameId: string;
     gameSecret: string;
@@ -42,6 +45,7 @@ export class Game {
     gameOptions?: Partial<GameOptions> | null;
     seed?: number | null;
     botWeights?: Record<string, number[][]>;
+    botConfigs?: Record<string, BotConfig>;
   }) {
     this.gameId = gameId;
     this.gameSecret = gameSecret;
@@ -49,6 +53,7 @@ export class Game {
     this.gameOptionsDeprecated = gameOptions || {};
     this.seed = seed;
     this.botWeights = botWeights;
+    this.botConfigs = botConfigs;
   }
 
   get gameSecretUNSAFE(): string {
@@ -81,6 +86,10 @@ export class Game {
 
   getBotWeights(playerId: string): number[][] | undefined {
     return this.botWeights[playerId];
+  }
+
+  getBotConfig(playerId: string): BotConfig | undefined {
+    return this.botConfigs[playerId];
   }
 
   // Runs fn with the engine rng (also passed to fn) seeded from (seed, stream,
@@ -117,6 +126,7 @@ export class Game {
             gameSecret: this.gameSecret,
             seed: this.seed,
             botWeights: this.botWeights,
+            botConfigs: this.botConfigs,
           }
         : {}),
     });
@@ -142,7 +152,11 @@ function generateNewGameId(): string {
 
 export const createGameFromGameState = async (
   gameState: GameState,
-  opts: { seed?: number | null; botWeights?: Record<string, number[][]> } = {}
+  opts: {
+    seed?: number | null;
+    botWeights?: Record<string, number[][]>;
+    botConfigs?: Record<string, BotConfig>;
+  } = {}
 ): Promise<Game> => {
   const game = new Game({
     gameId: generateNewGameId(),
@@ -157,8 +171,10 @@ export const createGameFromGameState = async (
 export type NewGamePlayer = {
   name: string;
   botType?: BotType | null;
-  // GREEDY evaluation weights; omit for the hand-tuned ones.
+  // GREEDY / MCTS_V evaluation weights; omit for the hand-tuned ones.
   botWeights?: number[][] | null;
+  // MCTS_V / AZ model and search settings.
+  botConfig?: BotConfig | null;
 };
 
 export const createGame = async (
@@ -186,16 +202,24 @@ export const createGame = async (
     createPlayer(name, { botType })
   );
   const botWeights: Record<string, number[][]> = {};
-  seating.forEach(({ botWeights: weights }, idx) => {
+  const botConfigs: Record<string, BotConfig> = {};
+  seating.forEach(({ botWeights: weights, botConfig }, idx) => {
     if (weights) {
       botWeights[players[idx].playerId] = weights;
+    }
+    if (botConfig) {
+      botConfigs[players[idx].playerId] = botConfig;
     }
   });
   // Seeded like arena.ts playGame, so a seed deals the same setup in both.
   const gameState = withRng(createSeededRng(seed), () =>
     GameState.initialGameState({ players, gameOptions })
   );
-  const game = await createGameFromGameState(gameState, { seed, botWeights });
+  const game = await createGameFromGameState(gameState, {
+    seed,
+    botWeights,
+    botConfigs,
+  });
   console.log(`Game created: ${game.gameId} (seed ${seed})`);
   return game;
 };

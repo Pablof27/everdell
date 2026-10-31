@@ -341,8 +341,17 @@ export type GameInputMultiStep = (
 export type GameInput = GameInputSimple | GameInputMultiStep;
 
 // Players with a botType have their turns played by the server (see src/bot).
-export const BOT_TYPES = ["RANDOM", "GREEDY"] as const;
+export const BOT_TYPES = ["RANDOM", "GREEDY", "MCTS_V", "AZ"] as const;
 export type BotType = typeof BOT_TYPES[number];
+
+// Search settings of MCTS_V and AZ bots; AZ bots also need a model.
+export type BotConfig = {
+  // AZ model: a directory holding model.json (or the manifest), under weights/.
+  modelFile?: string;
+  // Simulations per search, searches (determinizations) per move.
+  simulations?: number;
+  determinizations?: number;
+};
 
 export enum Season {
   WINTER = "Winter",

@@ -7,9 +7,11 @@ import {
   createArenaBots,
   runArena,
 } from "./arena";
+import { AzModel, ModelManifest, decodeParams } from "./network";
 
 export type ArenaWorkerRequest = {
-  bots: (ArenaBotSpec & { name: string })[];
+  // AZ bots name a model (under weights/), fetched from /api/bot-model.
+  bots: (Omit<ArenaBotSpec, "model"> & { name: string; modelFile?: string })[];
   numGames: number;
   seed: number;
   expansions: ArenaExpansions;
@@ -41,10 +43,31 @@ export type ArenaWorkerMessage =
 const ctx = (self as unknown) as Worker;
 const post = (message: ArenaWorkerMessage) => ctx.postMessage(message);
 
-ctx.onmessage = ({ data }: MessageEvent<ArenaWorkerRequest>) => {
+async function fetchModel(modelFile: string): Promise<AzModel> {
+  const url = (part: string) =>
+    `/api/bot-model?file=${encodeURIComponent(modelFile)}&part=${part}`;
+  const [manifest, params] = await Promise.all([
+    fetch(url("manifest")).then((r) => {
+      if (!r.ok) {
+        throw new Error(`Unable to load the model ${modelFile}`);
+      }
+      return r.json() as Promise<ModelManifest>;
+    }),
+    fetch(url("params")).then((r) => r.arrayBuffer()),
+  ]);
+  return new AzModel(manifest, decodeParams(params));
+}
+
+ctx.onmessage = async ({ data }: MessageEvent<ArenaWorkerRequest>) => {
   try {
+    const specs: ArenaBotSpec[] = await Promise.all(
+      data.bots.map(async ({ modelFile, ...spec }) => ({
+        ...spec,
+        model: modelFile ? await fetchModel(modelFile) : null,
+      }))
+    );
     runArena({
-      bots: createArenaBots(data.bots, data.seed),
+      bots: createArenaBots(specs, data.seed),
       numGames: data.numGames,
       seed: data.seed,
       gameOptions: arenaGameOptions(data.expansions),

@@ -41,6 +41,8 @@ type BotValues = {
   botType: BotType;
   // "" = hand-tuned weights.
   weightsFile: string;
+  // AZ model directory (under weights/).
+  modelFile: string;
 };
 
 type ArenaRun = {
@@ -51,12 +53,20 @@ type ArenaRun = {
   error: string | null;
 };
 
-const botLabel = ({ bot, botType, weightsFile }: BotValues): string => {
+const botLabel = ({
+  bot,
+  botType,
+  weightsFile,
+  modelFile,
+}: BotValues): string => {
   if (bot !== CUSTOM_BOT) {
     return bot;
   }
-  return botType === "GREEDY" && weightsFile
-    ? `Greedy ${weightsFile.replace(/\.json$/, "")}`
+  if (botType === "AZ" && modelFile) {
+    return `AlphaZero ${modelFile}`;
+  }
+  return (botType === "GREEDY" || botType === "MCTS_V") && weightsFile
+    ? `${BOT_TYPE_LABELS[botType]} ${weightsFile.replace(/\.json$/, "")}`
     : BOT_TYPE_LABELS[botType];
 };
 
@@ -77,18 +87,27 @@ const toBotSpec = (
 ): ArenaWorkerRequest["bots"][number] => {
   const difficulty = difficulties.find((d) => d.name === values.bot);
   if (difficulty) {
+    const { botType, botWeights, botConfig } = difficulty.bot;
     return {
       name,
-      botType: difficulty.bot.botType,
-      weights: difficulty.bot.botWeights,
+      botType,
+      weights: botWeights,
+      simulations: botConfig?.simulations,
+      determinizations: botConfig?.determinizations,
+      modelFile: botConfig?.modelFile,
     };
   }
-  const { botType, weightsFile } = values;
+  const { botType, weightsFile, modelFile } = values;
   const weights =
-    botType === "GREEDY"
+    botType === "GREEDY" || botType === "MCTS_V"
       ? weightsFiles.find((w) => w.file === weightsFile)?.weights
       : null;
-  return { name, botType, weights };
+  return {
+    name,
+    botType,
+    weights,
+    modelFile: botType === "AZ" ? modelFile : undefined,
+  };
 };
 
 // Tallied like runArena: tied winners split the win.
@@ -139,12 +158,17 @@ const ArenaSetup: React.FC<{
   onRun: (request: ArenaWorkerRequest) => void;
   onStop: () => void;
 }> = ({ botOptions, running, onRun, onStop }) => {
-  const { difficulties, weightsFiles } = botOptions;
+  const { difficulties, weightsFiles, modelFiles } = botOptions;
+  // AZ bots need a model.
+  const botTypes = BOT_TYPES.filter(
+    (type) => type !== "AZ" || modelFiles.length > 0
+  );
   // The hardest difficulty, then the next ones.
   const defaultBot = (rank = 0): BotValues => ({
     bot: difficulties[difficulties.length - 1 - rank]?.name ?? CUSTOM_BOT,
     botType: "GREEDY",
     weightsFile: weightsFiles[weightsFiles.length - 1]?.file ?? "",
+    modelFile: modelFiles[modelFiles.length - 1] ?? "",
   });
 
   const [bots, setBots] = useState<BotValues[]>(() => [
@@ -252,13 +276,13 @@ const ArenaSetup: React.FC<{
                       })
                     }
                   >
-                    {BOT_TYPES.map((type) => (
+                    {botTypes.map((type) => (
                       <option key={type} value={type}>
                         {BOT_TYPE_LABELS[type]}
                       </option>
                     ))}
                   </select>
-                  {bot.botType === "GREEDY" && (
+                  {(bot.botType === "GREEDY" || bot.botType === "MCTS_V") && (
                     <select
                       className={styles.select}
                       value={bot.weightsFile}
@@ -273,6 +297,22 @@ const ArenaSetup: React.FC<{
                         </option>
                       ))}
                       <option value="">Hand-tuned weights</option>
+                    </select>
+                  )}
+                  {bot.botType === "AZ" && (
+                    <select
+                      className={styles.select}
+                      value={bot.modelFile}
+                      title="Model (under weights/)"
+                      onChange={(e) =>
+                        updateBot(idx, { modelFile: e.target.value })
+                      }
+                    >
+                      {modelFiles.map((file) => (
+                        <option key={file} value={file}>
+                          {file}
+                        </option>
+                      ))}
                     </select>
                   )}
                 </div>

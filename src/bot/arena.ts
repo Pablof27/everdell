@@ -5,6 +5,7 @@ import { createSeededRng, withRng } from "../model/random";
 import { Bot, createBot } from "./bot";
 import { Weights } from "./evaluations";
 import { getLegalMoves } from "./legalMoves";
+import type { AzModel } from "./network";
 
 export type GameResult = {
   seed: number;
@@ -210,20 +211,28 @@ export function runArena({
 
 export type ArenaBotSpec = {
   botType: BotType;
-  // GREEDY evaluation weights (default: hand-tuned).
+  // GREEDY / MCTS_V evaluation weights (default: hand-tuned).
   weights?: Weights | null;
   name?: string;
+  // MCTS_V / AZ search settings, and the AZ network.
+  simulations?: number;
+  determinizations?: number;
+  model?: AzModel | null;
 };
 
 // Bot i's rng is seeded from (seed, i), so the same specs and seed replay the
 // same arena in the CLI and in the arena page.
 export function createArenaBots(specs: ArenaBotSpec[], seed: number): Bot[] {
-  return specs.map(({ botType, weights, name }, idx) =>
-    createBot(botType, {
-      name,
-      rng: createSeededRng(seed * 1000 + idx),
-      weights: weights || undefined,
-    })
+  return specs.map(
+    ({ botType, weights, name, simulations, determinizations, model }, idx) =>
+      createBot(botType, {
+        name,
+        rng: createSeededRng(seed * 1000 + idx),
+        weights: weights || undefined,
+        simulations,
+        determinizations,
+        model: model || undefined,
+      })
   );
 }
 

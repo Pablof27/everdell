@@ -29,28 +29,36 @@ export class GreedyBot implements Bot {
     }
 
     chooseMove(_gameState: GameState, legalMoves: GameInput[]): GameInput {
-        const me = _gameState.getActivePlayer().playerId
-        let root = determinize(_gameState, me, this.rng)
-        var bestMove = null
-        var bestScore = -Infinity
+        const scores = this.scoreMoves(_gameState, legalMoves)
+        let best = -1
+        let bestScore = -Infinity
+        scores.forEach((score, i) => {
+            if (score !== null && bestScore < score) {
+                bestScore = score
+                best = i
+            }
+        })
 
-        for (const move of legalMoves) {
+        return best === -1 ? legalMoves[0] : legalMoves[best]
+    }
+
+    // Evaluation of each move after resolving its follow-up inputs greedily, plus a tiny random
+    // tie-breaker; null for moves the engine rejects.
+    scoreMoves(_gameState: GameState, legalMoves: GameInput[]): (number | null)[] {
+        const me = _gameState.getActivePlayer().playerId
+        const root = determinize(_gameState, me, this.rng)
+
+        return legalMoves.map(move => {
             let s = root
             try {
                 s = root.next(cloneDeep(move), true, true)
             } catch (e) {
                 console.error(e)
-                continue
+                return null
             }
             s = this.resolvePendingGreedily(s, me)
-            let score = evaluate(s, me, this.weights) + this.rng() * 1e-6
-            if (bestScore < score) {
-                bestScore = score
-                bestMove = move
-            }
-        }
-
-        return bestMove ?? legalMoves[0]
+            return evaluate(s, me, this.weights) + this.rng() * 1e-6
+        })
     }
 
 

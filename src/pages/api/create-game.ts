@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { createGame, NewGamePlayer } from "../../model/game";
 import { MAX_SEED } from "../../model/random";
 import { playBotTurns } from "../../bot/botRunner";
-import { resolveBotChoice } from "../../bot/botCatalog";
+import { botModelNumPlayers, resolveBotChoice } from "../../bot/botCatalog";
 
 export default async (
   req: NextApiRequest,
@@ -54,6 +54,14 @@ export default async (
       name: p.name,
       ...(p.bot ? resolveBotChoice(p.bot) : {}),
     }));
+    players.forEach(({ botConfig }) => {
+      const numPlayers = botModelNumPlayers(botConfig);
+      if (numPlayers !== null && numPlayers !== players.length) {
+        throw new Error(
+          `This AlphaZero bot plays ${numPlayers}-player games only`
+        );
+      }
+    });
   } catch (e) {
     res.status(400).json({
       success: false,

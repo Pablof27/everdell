@@ -1,0 +1,3 @@
+RANDOM
+GREEDY:weights/run4/greedy-evolved.json
+MCTS_V:weights/run4/greedy-evolved.json:vmode=root

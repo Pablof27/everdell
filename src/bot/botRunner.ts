@@ -1,6 +1,7 @@
 import { Game } from "../model/game";
 import { createBot } from "./bot";
 import { getLegalMoves } from "./legalMoves";
+import { botConfigOptions } from "./botCatalog";
 
 // Safety net against a bot that never ends its turn.
 const MAX_BOT_MOVES_PER_CALL = 500;
@@ -36,6 +37,7 @@ export async function playBotTurns(game: Game): Promise<number> {
         const bot = createBot(botType, {
           rng,
           weights: game.getBotWeights(player.playerId),
+          ...botConfigOptions(game.getBotConfig(player.playerId)),
         });
         let legalMoves = getLegalMoves(gameState, { rng });
         if (legalMoves.length === 0) {

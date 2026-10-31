@@ -1,5 +1,6 @@
 import {
   AdornmentName,
+  BotConfig,
   BotType,
   CardName,
   EventName,
@@ -28,6 +29,7 @@ export type GameJSON = {
   // Private; absent in games created before they existed.
   seed?: number | null;
   botWeights?: Record<string, number[][]>;
+  botConfigs?: Record<string, BotConfig>;
 };
 
 export type GameStateJSON = {

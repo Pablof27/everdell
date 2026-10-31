@@ -14,6 +14,7 @@ import {
   GameInput,
   GameInputMultiStep,
   GameInputPlayCard,
+  GameInputSelectPaymentForCard,
   GameInputType,
   LocationName,
   ResourceType,
@@ -570,21 +571,14 @@ function getPendingInputMoves(
         return { ...pending, clientOptions: { resources } };
       });
     }
-    case GameInputType.SELECT_PAYMENT_FOR_CARD: {
-      // Inn / Hotel / Locomotive give 3 fewer ANY, the forest location 1 fewer.
-      const discount: PaymentDiscount = pending.cardContext ? "ANY 3" : "ANY 1";
-      const cost = toResourceVec(Card.fromName(pending.card).baseCost);
-      const have = PAYABLE_RESOURCES.map((r) =>
-        player.getNumResourcesByType(r)
-      );
-      return getResourcePayments(cost, have, discount, false).map((vec) => ({
+    case GameInputType.SELECT_PAYMENT_FOR_CARD:
+      return getPaymentForCardOptions(gameState, pending).map((resources) => ({
         ...pending,
         clientOptions: {
           card: pending.card,
-          paymentOptions: { resources: toCardCost(vec) },
+          paymentOptions: { resources },
         },
       }));
-    }
     default:
       assertUnreachable(
         pending,
@@ -596,6 +590,22 @@ function getPendingInputMoves(
 // ---------------------------------------------------------------------------
 // Combinatorics helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * The resource payments offered for a pending SELECT_PAYMENT_FOR_CARD, in the
+ * order getLegalMoves() lists them (deterministic).
+ */
+export function getPaymentForCardOptions(
+  gameState: GameState,
+  pending: GameInputSelectPaymentForCard
+): CardCost[] {
+  const player = gameState.getActivePlayer();
+  // Inn / Hotel / Locomotive give 3 fewer ANY, the forest location 1 fewer.
+  const discount: PaymentDiscount = pending.cardContext ? "ANY 3" : "ANY 1";
+  const cost = toResourceVec(Card.fromName(pending.card).baseCost);
+  const have = PAYABLE_RESOURCES.map((r) => player.getNumResourcesByType(r));
+  return getResourcePayments(cost, have, discount, false).map(toCardCost);
+}
 
 // Whether triggering the location's effect would be accepted by the engine.
 // Ignores occupancy / worker availability (irrelevant when copying).

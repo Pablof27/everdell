@@ -62,6 +62,61 @@ To regenerate these, you can run `npm run collect_test_data`
 
 The app uses sqlite or postgres for to store the game state across server restarts. Which dbms we use is determined by the environment variables. When deploying to Heroku, its recommended to use postgres so game state is persisted across deploys.
 
+### Bots
+
+Players of a new game can be bots (`src/bot/`), picked by difficulty (`src/bot/difficulties.ts`) or as a custom strategy:
+
+| Bot      | How it plays                                                                                                                                  |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RANDOM` | A uniformly random legal move.                                                                                                                |
+| `GREEDY` | One move ahead, scored by a linear evaluation whose weights are evolved with CMA-ES (`npm run evolve`, weights in `weights/run*/`).           |
+| `MCTS_V` | Monte Carlo Tree Search (`src/bot/mcts.ts`) on a determinization of the hidden cards, uniform priors and the linear evaluation at the leaves. |
+| `AZ`     | AlphaZero-style: the same search guided by a policy/value network trained by self-play (`weights/az/`).                                       |
+
+Bots play each other in the arena, from the command line or at `/arena`:
+
+```bash
+npm run arena -- --bots=GREEDY:weights/run4/greedy-evolved.json,RANDOM --games=100
+# Search bots take options (sims, k = determinizations, ...; see src/bot/botSpecs.ts);
+# --workers plays games in parallel, --paired deals the same cards to both seatings.
+npm run arena -- --bots=AZ:weights/az/expert:sims=200,MCTS_V:weights/run4/greedy-evolved.json --games=200 --workers=8 --paired
+```
+
+#### Training the AlphaZero bot
+
+The network is trained in Python ([PyTorch](https://pytorch.org)) on games the bot plays against itself in TypeScript:
+
+```bash
+python3 -m venv train/.venv && train/.venv/bin/pip install -r train/requirements.txt
+
+# The whole loop: self-play with the best network, train a candidate, gate it against the best
+# (it must win 55% of 200 games), measure it against fixed anchors. Resumable.
+npm run az-loop -- --run=run1 --generations=4 --games=1000 --sims=200 --fullProb=0.25 --fastSims=50 \
+  --warmGames=5000 --warmBot=GREEDY:weights/run4/greedy-evolved.json --warmTemp=0.17 --warmEpochs=4
+```
+
+It writes self-play data to `data/az/<run>/` (not committed), models to `weights/az/<run>/gen-XXX/`, the current best to `weights/az/<run>/best/` and one row per generation to `weights/az/<run>/progress.csv`. `--warmGames` first trains generation 0 on the greedy bot's games; `--fullProb`/`--fastSims` enable playout cap randomization. The steps also run on their own:
+
+```bash
+npm run selfplay -- --bot=AZ:weights/az/run1/best --games=200 --sims=200 --out=data/az/run1/extra
+npm run train -- --data data/az/run1 --window 3000 --init weights/az/run1/best/model.json --out weights/az/run1/manual
+npm run train -- --data data/az/run1 --overfit 64 --steps 200   # pipeline sanity check
+```
+
+A model is a `model.json` manifest (layer offsets, action vocabulary, feature scaling table) plus `model.bin` (float32 parameters); `src/bot/network.ts` runs it in TypeScript and refuses models built for another vocabulary or state encoding. Models are trained for 2-player games. The `Expert` difficulty plays `weights/az/expert` (generation 3 of run1) with 400 simulations × 3 determinizations.
+
+Measured on an Apple M3 Pro (2-player base game, `--paired` arenas of 100–200 games):
+
+| Matchup                                        | Win rate | Mean VP      |
+| ---------------------------------------------- | -------- | ------------ |
+| `MCTS_V` (200 sims) vs `GREEDY` (same weights) | 41–45%   | 36 vs 40     |
+| `AZ` gen 0, warm start (200 sims) vs `GREEDY`  | 66.5%    | 42.8 vs 39.5 |
+| `AZ` gen 3 (200 sims) vs `GREEDY`              | 91%      | 49.4 vs 36.7 |
+| `AZ` gen 3 (200 sims) vs `MCTS_V` (200 sims)   | 95%      | 48.5 vs 31.6 |
+| `Expert` (400 sims × 3) vs `GREEDY` (Hard)     | 91%      | 48.6 vs 35.8 |
+
+A search costs about 0.25 ms per simulation for both `MCTS_V` and `AZ` (200 simulations ≈ 50 ms). `MCTS_V` stays slightly below `GREEDY`: its weights were evolved to rank moves one ply ahead (eg. available workers are worth a lot, which swings the value at every worker placement deeper in the tree), and `tanh` saturates once a game looks decided.
+
 ### Getting Started
 
 Install dependencies:

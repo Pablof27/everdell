@@ -29,7 +29,12 @@ import { determinize } from "./determinize";
 import { playBotTurns } from "./botRunner";
 import { handTunedWeights } from "./evaluations";
 import { BOT_DIFFICULTIES } from "./difficulties";
-import { listWeightsFiles, resolveBotChoice } from "./botCatalog";
+import {
+  listModelFiles,
+  listWeightsFiles,
+  resolveBotChoice,
+} from "./botCatalog";
+import { formatBotSpec, parseBotSpec } from "./botSpecs";
 
 const NEWLEAF_OPTIONS: Partial<GameOptions> = {
   newleaf: {
@@ -469,6 +474,62 @@ describe("botRunner", () => {
   it("createBot rejects unknown bot types", () => {
     expect(() => createBot("NOPE" as any)).to.throwException();
   });
+
+  it("createBot needs a model for AZ bots", () => {
+    expect(() => createBot("AZ")).to.throwException(/model/);
+  });
+
+  it("plays MCTS_V turns with the game's stored search settings", async function () {
+    this.timeout(30000);
+    const game = await createGame(
+      [
+        {
+          name: "Search",
+          botType: "MCTS_V",
+          botWeights: handTunedWeights(),
+          botConfig: { simulations: 4, determinizations: 2 },
+        },
+        { name: "Human" },
+      ],
+      {},
+      { seed: 7 }
+    );
+    const numMoves = await playBotTurns(game);
+    expect(numMoves > 0).to.be(true);
+    expect(game.getActivePlayer().name).to.be("Human");
+    const bot = game.getGameState().players.find((p) => p.name === "Search")!;
+    expect(Game.fromJSON(game.toJSON(true)).getBotConfig(bot.playerId)).to.eql({
+      simulations: 4,
+      determinizations: 2,
+    });
+    expect(game.toJSON(false).botConfigs).to.be(undefined);
+  });
+});
+
+describe("botSpecs", () => {
+  it("parses and formats command line bot specs", () => {
+    const spec = parseBotSpec(
+      "MCTS_V:weights/run4/greedy-evolved.json:sims=50:k=2:vmode=root:name=X"
+    );
+    expect(spec).to.eql({
+      botType: "MCTS_V",
+      weightsFile: "weights/run4/greedy-evolved.json",
+      simulations: 50,
+      determinizations: 2,
+      valueMode: "rootPlayer",
+      name: "X",
+    });
+    expect(formatBotSpec(spec)).to.be(
+      "MCTS_V:weights/run4/greedy-evolved.json:sims=50:k=2:vmode=root"
+    );
+    expect(parseBotSpec("AZ:weights/az/x/best").modelFile).to.be(
+      "weights/az/x/best"
+    );
+    expect(() => parseBotSpec("AZ")).to.throwException(/model/);
+    expect(() => parseBotSpec("GREEDY:sims=abc")).to.throwException();
+    expect(() => parseBotSpec("NOPE")).to.throwException();
+    expect(() => parseBotSpec("MCTS_V:foo=1")).to.throwException();
+  });
 });
 
 describe("seeded games", () => {
@@ -541,14 +602,31 @@ describe("botCatalog", () => {
   });
 
   it("resolves every configured difficulty", () => {
-    BOT_DIFFICULTIES.forEach(({ name, botType, weightsFile }) => {
-      const bot = resolveBotChoice({ difficulty: name });
-      expect(bot.botType).to.be(botType);
-      expect(!!bot.botWeights).to.be(!!weightsFile);
-    });
+    BOT_DIFFICULTIES.forEach(
+      ({ name, botType, weightsFile, modelFile, simulations }) => {
+        const bot = resolveBotChoice({ difficulty: name });
+        expect(bot.botType).to.be(botType);
+        expect(!!bot.botWeights).to.be(!!weightsFile);
+        expect(bot.botConfig?.modelFile).to.be(modelFile);
+        expect(bot.botConfig?.simulations).to.be(simulations);
+      }
+    );
   });
 
-  it("rejects unknown difficulties, strategies and weights files", () => {
+  it("lists AZ models and resolves AZ / MCTS_V choices", () => {
+    listModelFiles().forEach((modelFile) => {
+      expect(resolveBotChoice({ botType: "AZ", modelFile })).to.eql({
+        botType: "AZ",
+        botWeights: null,
+        botConfig: { modelFile },
+      });
+    });
+    const weightsFile = listWeightsFiles()[0];
+    const mctsV = resolveBotChoice({ botType: "MCTS_V", weightsFile });
+    expect(!!mctsV.botWeights).to.be(true);
+  });
+
+  it("rejects unknown difficulties, strategies, weights files and models", () => {
     expect(() =>
       resolveBotChoice({ difficulty: "Impossible" })
     ).to.throwException();
@@ -562,6 +640,13 @@ describe("botCatalog", () => {
       resolveBotChoice({
         botType: "GREEDY",
         weightsFile: "run1/checkpoints/gen-001.json",
+      })
+    ).to.throwException();
+    expect(() => resolveBotChoice({ botType: "AZ" })).to.throwException();
+    expect(() =>
+      resolveBotChoice({
+        botType: "AZ",
+        modelFile: "../src/bot/testdata/tiny-model",
       })
     ).to.throwException();
   });

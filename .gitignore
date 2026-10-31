@@ -40,3 +40,8 @@ cypress/screenshots
 tsconfig.tsbuildinfo
 /docs
 todos.txt
+
+# AlphaZero bot: self-play data and the trainer's virtualenv
+/data
+/train/.venv
+__pycache__/

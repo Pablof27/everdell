@@ -1,0 +1,88 @@
+{
+ "positions": 489749,
+ "games": 5000,
+ "files": 625,
+ "trainPositions": 465296,
+ "heldOutPositions": 24453,
+ "steps": 1820,
+ "seconds": 12.508434057235718,
+ "args": {
+  "data": [
+   "data/az/run1/warm"
+  ],
+  "encoding": null,
+  "window": 0,
+  "out": "weights/az/run1/gen-000",
+  "init": null,
+  "hidden": "256,128",
+  "epochs": 4,
+  "batch": 1024,
+  "lr": 0.001,
+  "wd": 0.0001,
+  "margin_weight": 0.5,
+  "q_weight": 0.0,
+  "holdout": 0.05,
+  "seed": 1,
+  "device": "cpu",
+  "tag": "run1/warm",
+  "overfit": 0,
+  "steps": 200,
+  "random_init": false,
+  "export_fixture": null
+ },
+ "train": {
+  "policyCE": 1.1238844990730286,
+  "valueMSE": 0.5587182100657578,
+  "marginHuber": 0.11886437699853719
+ },
+ "heldOutBefore": {
+  "policyCE": 2.2683025291204846,
+  "policyKL": 1.249028906753973,
+  "valueMSE": 0.9689972556568979,
+  "valueSignAcc": 0.5217170649185875,
+  "endgameSignAcc": 0.6064996895052784,
+  "policyEntropy": 2.2661016555059526,
+  "calibration": [
+   {
+    "v": "[-0.2,0.2)",
+    "meanZ": 0.04199893673577884,
+    "n": 24453
+   }
+  ]
+ },
+ "heldOut": {
+  "policyCE": 1.1211373894924348,
+  "policyKL": 0.10186377786398773,
+  "valueMSE": 0.9125426839242629,
+  "valueSignAcc": 0.6301966589130894,
+  "endgameSignAcc": 0.8132891740840406,
+  "policyEntropy": 1.1166111236722598,
+  "calibration": [
+   {
+    "v": "[-1.0,-0.6)",
+    "meanZ": -0.5243488108720272,
+    "n": 3532
+   },
+   {
+    "v": "[-0.6,-0.2)",
+    "meanZ": -0.14416419386745796,
+    "n": 4044
+   },
+   {
+    "v": "[-0.2,0.2)",
+    "meanZ": -0.02427947598253275,
+    "n": 5725
+   },
+   {
+    "v": "[0.2,0.6)",
+    "meanZ": 0.09227175394198948,
+    "n": 5137
+   },
+   {
+    "v": "[0.6,1.0)",
+    "meanZ": 0.5198669991687448,
+    "n": 6015
+   }
+  ]
+ }
+}

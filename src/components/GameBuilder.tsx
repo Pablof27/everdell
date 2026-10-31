@@ -12,6 +12,8 @@ const CUSTOM_BOT = "custom";
 export const BOT_TYPE_LABELS: Record<BotType, string> = {
   RANDOM: "Random",
   GREEDY: "Greedy",
+  MCTS_V: "MCTS (linear value)",
+  AZ: "AlphaZero",
 };
 
 type PlayerValues = {
@@ -20,16 +22,22 @@ type PlayerValues = {
   botType: BotType;
   // "" = hand-tuned weights.
   weightsFile: string;
+  // AZ model directory (under weights/).
+  modelFile: string;
 };
 
 let playerIdx = 0;
-const getDummyPlayer = (weightsFiles: string[], name = ""): PlayerValues => {
+const getDummyPlayer = (
+  { weightsFiles, modelFiles }: BotOptions,
+  name = ""
+): PlayerValues => {
   playerIdx++;
   return {
     name: name || `Player ${playerIdx}`,
     bot: HUMAN,
     botType: "GREEDY",
     weightsFile: weightsFiles[weightsFiles.length - 1] || "",
+    modelFile: modelFiles[modelFiles.length - 1] || "",
   };
 };
 
@@ -37,12 +45,16 @@ const toBotChoice = ({
   bot,
   botType,
   weightsFile,
+  modelFile,
 }: PlayerValues): BotChoice | null => {
   if (bot === HUMAN) {
     return null;
   }
   if (bot === CUSTOM_BOT) {
-    return botType === "GREEDY" && weightsFile
+    if (botType === "AZ") {
+      return { botType, modelFile };
+    }
+    return (botType === "GREEDY" || botType === "MCTS_V") && weightsFile
       ? { botType, weightsFile }
       : { botType };
   }
@@ -51,14 +63,18 @@ const toBotChoice = ({
 
 const GameBuilder: React.FC<{ botOptions: BotOptions }> = ({ botOptions }) => {
   const router = useRouter();
-  const { difficulties, weightsFiles } = botOptions;
+  const { difficulties, weightsFiles, modelFiles } = botOptions;
+  // AZ bots need a model.
+  const botTypes = BOT_TYPES.filter(
+    (type) => type !== "AZ" || modelFiles.length > 0
+  );
   return (
     <div id={"js-game-builder"}>
       <Formik
         initialValues={{
           players: [
-            getDummyPlayer(weightsFiles, "Player 1"),
-            getDummyPlayer(weightsFiles, "Player 2"),
+            getDummyPlayer(botOptions, "Player 1"),
+            getDummyPlayer(botOptions, "Player 2"),
           ],
           randomizeStartingPlayer: true,
           chooseStartingResources: true,
@@ -156,7 +172,7 @@ const GameBuilder: React.FC<{ botOptions: BotOptions }> = ({ botOptions }) => {
                                     onClick={() =>
                                       arrayHelpers.insert(
                                         idx + 1,
-                                        getDummyPlayer(weightsFiles)
+                                        getDummyPlayer(botOptions)
                                       )
                                     }
                                   >
@@ -172,13 +188,14 @@ const GameBuilder: React.FC<{ botOptions: BotOptions }> = ({ botOptions }) => {
                                     className={styles.game_builder_select}
                                     title="Strategy"
                                   >
-                                    {BOT_TYPES.map((type) => (
+                                    {botTypes.map((type) => (
                                       <option key={type} value={type}>
                                         {BOT_TYPE_LABELS[type]}
                                       </option>
                                     ))}
                                   </Field>
-                                  {player.botType === "GREEDY" && (
+                                  {(player.botType === "GREEDY" ||
+                                    player.botType === "MCTS_V") && (
                                     <Field
                                       as="select"
                                       name={`players.${idx}.weightsFile`}
@@ -193,6 +210,20 @@ const GameBuilder: React.FC<{ botOptions: BotOptions }> = ({ botOptions }) => {
                                       <option value="">
                                         Hand-tuned weights
                                       </option>
+                                    </Field>
+                                  )}
+                                  {player.botType === "AZ" && (
+                                    <Field
+                                      as="select"
+                                      name={`players.${idx}.modelFile`}
+                                      className={styles.game_builder_select}
+                                      title="Model (under weights/)"
+                                    >
+                                      {modelFiles.map((file) => (
+                                        <option key={file} value={file}>
+                                          {file}
+                                        </option>
+                                      ))}
                                     </Field>
                                   )}
                                 </div>
